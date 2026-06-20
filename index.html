@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Firmware Engineer — Portfolio</title>
+<meta name="description" content="Embedded / firmware engineer working with Zephyr RTOS and Yocto. Selected projects and contact." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<div class="grid-overlay" aria-hidden="true"></div>
+
+<!-- Boot sequence -->
+<div id="boot" class="boot" aria-hidden="true">
+  <pre id="bootlog" class="bootlog"></pre>
+</div>
+
+<header class="topbar">
+  <span class="logo">0x<span class="logo-accent">init</span></span>
+  <nav class="nav">
+    <a href="#work">work</a>
+    <a href="#about">about</a>
+    <a href="#stack">stack</a>
+    <a href="#contact">contact</a>
+  </nav>
+</header>
+
+<main>
+  <!-- HERO -->
+  <section class="hero" id="top">
+    <p class="eyebrow">// embedded systems · firmware</p>
+    <h1 class="hero-title">
+      I write the code that runs<br />
+      <span class="accent">closest to the metal.</span>
+    </h1>
+    <p class="hero-sub">
+      Firmware &amp; embedded engineer. I build reliable systems on
+      <strong>Zephyr RTOS</strong> and ship production Linux images with
+      <strong>Yocto</strong> — from board bring-up to OTA.
+    </p>
+    <div class="hero-actions">
+      <a href="#work" class="btn btn-primary">View work</a>
+      <a href="#contact" class="btn btn-ghost">Get in touch</a>
+    </div>
+
+    <!-- Register-map status strip -->
+    <div class="reg-strip" aria-hidden="true">
+      <div class="reg"><span class="reg-addr">0x00</span><span class="reg-label">RTOS</span><span class="reg-val">ZEPHYR</span></div>
+      <div class="reg"><span class="reg-addr">0x04</span><span class="reg-label">BUILD</span><span class="reg-val">YOCTO</span></div>
+      <div class="reg"><span class="reg-addr">0x08</span><span class="reg-label">LANG</span><span class="reg-val">C / C++</span></div>
+      <div class="reg"><span class="reg-addr">0x0C</span><span class="reg-label">STATUS</span><span class="reg-val ok">READY</span></div>
+    </div>
+  </section>
+
+  <!-- WORK -->
+  <section class="section" id="work">
+    <div class="section-head">
+      <h2 class="section-title">Selected work</h2>
+      <span class="section-meta">/* more landing soon */</span>
+    </div>
+
+    <div class="cards">
+      <!-- TEMPLATE CARD — duplicate this block per project -->
+      <a class="card" href="projects/project-template.html">
+        <div class="card-top">
+          <span class="card-addr">0x01</span>
+          <span class="card-status wip">WIP</span>
+        </div>
+        <h3 class="card-title">Project name</h3>
+        <p class="card-desc">One sentence on what the device did and the hard part you owned.</p>
+        <ul class="tags">
+          <li>Zephyr</li><li>nRF52</li><li>BLE</li>
+        </ul>
+      </a>
+
+      <a class="card" href="projects/project-template.html">
+        <div class="card-top">
+          <span class="card-addr">0x02</span>
+          <span class="card-status wip">WIP</span>
+        </div>
+        <h3 class="card-title">Project name</h3>
+        <p class="card-desc">One sentence on the Yocto image / BSP you built and why it mattered.</p>
+        <ul class="tags">
+          <li>Yocto</li><li>i.MX8</li><li>Linux</li>
+        </ul>
+      </a>
+
+      <a class="card" href="projects/project-template.html">
+        <div class="card-top">
+          <span class="card-addr">0x03</span>
+          <span class="card-status wip">WIP</span>
+        </div>
+        <h3 class="card-title">Project name</h3>
+        <p class="card-desc">One sentence on a driver, bootloader, or OTA system you shipped.</p>
+        <ul class="tags">
+          <li>C</li><li>MCUboot</li><li>OTA</li>
+        </ul>
+      </a>
+
+      <!-- Add-more placeholder -->
+      <div class="card card-empty">
+        <span class="plus">+</span>
+        <p>More projects landing<br />over the next weeks</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="section" id="about">
+    <div class="section-head">
+      <h2 class="section-title">About</h2>
+      <span class="section-meta">// who's at the keyboard</span>
+    </div>
+    <div class="about-grid">
+      <p class="about-lead">
+        I'm a firmware / embedded engineer focused on making constrained
+        hardware do reliable, useful things.
+      </p>
+      <p class="about-body">
+        [ Replace this with your story — years of experience, the kinds of
+        devices you've worked on, what you care about (low power, real-time
+        guarantees, secure boot, maintainable BSPs). Keep it specific. ]
+      </p>
+    </div>
+  </section>
+
+  <!-- STACK -->
+  <section class="section" id="stack">
+    <div class="section-head">
+      <h2 class="section-title">Stack</h2>
+      <span class="section-meta">// tools of the trade</span>
+    </div>
+    <div class="stack-grid">
+      <div class="stack-col">
+        <h4>RTOS &amp; OS</h4>
+        <ul><li>Zephyr RTOS</li><li>Yocto / OpenEmbedded</li><li>Embedded Linux</li><li>FreeRTOS</li></ul>
+      </div>
+      <div class="stack-col">
+        <h4>Languages</h4>
+        <ul><li>C</li><li>C++</li><li>Python</li><li>Bash / Make</li></ul>
+      </div>
+      <div class="stack-col">
+        <h4>Hardware &amp; buses</h4>
+        <ul><li>ARM Cortex-M / A</li><li>I²C · SPI · UART</li><li>BLE · LoRa</li><li>JTAG / SWD</li></ul>
+      </div>
+      <div class="stack-col">
+        <h4>Tooling</h4>
+        <ul><li>West · CMake · Kconfig</li><li>BitBake · devtool</li><li>GDB · OpenOCD</li><li>Git · CI/CD</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section class="section contact" id="contact">
+    <h2 class="section-title">Let's build something</h2>
+    <p class="contact-sub">Open to embedded firmware roles and contract work.</p>
+    <div class="contact-links">
+      <a href="mailto:you@example.com" class="btn btn-primary">you@example.com</a>
+      <a href="https://github.com/yourusername" class="btn btn-ghost">GitHub</a>
+      <a href="https://linkedin.com/in/yourusername" class="btn btn-ghost">LinkedIn</a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>&copy; <span id="year"></span> — built &amp; deployed on GitHub Pages</span>
+  <span class="footer-meta">v0.1.0 · last commit pending</span>
+</footer>
+
+<script src="assets/main.js"></script>
+</body>
+</html>

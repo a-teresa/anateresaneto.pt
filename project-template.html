@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Project name — Portfolio</title>
+<meta name="description" content="Project case study: what it was, what I built, and the outcome." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/style.css" />
+<style>
+  .case { max-width: 760px; margin: 0 auto; padding: 60px 24px 90px; }
+  .back { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
+  .back:hover { color: var(--accent); }
+  .case h1 { font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -1px; margin: 28px 0 14px; }
+  .case .meta { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-bottom: 40px; }
+  .case h2 { font-size: 1.3rem; margin: 38px 0 12px; }
+  .case p { color: #b7bcc4; margin-bottom: 14px; }
+  .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
+  .case li { margin-bottom: 6px; }
+  .specs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line);
+           border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin: 30px 0; }
+  .spec { background: var(--bg-elev); padding: 16px 18px; }
+  .spec span { font-family: var(--mono); font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .spec strong { font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="grid-overlay" aria-hidden="true"></div>
+
+<header class="topbar">
+  <span class="logo">0x<span class="logo-accent">init</span></span>
+  <nav class="nav"><a href="../index.html#work">← all work</a></nav>
+</header>
+
+<main class="case">
+  <a class="back" href="../index.html#work">← back to work</a>
+  <h1>Project name</h1>
+  <p class="meta">// role · timeframe · status</p>
+
+  <div class="specs">
+    <div class="spec"><span>PLATFORM</span><strong>e.g. nRF5340</strong></div>
+    <div class="spec"><span>RTOS / OS</span><strong>Zephyr / Yocto</strong></div>
+    <div class="spec"><span>MY ROLE</span><strong>Firmware lead</strong></div>
+    <div class="spec"><span>STATUS</span><strong>In progress</strong></div>
+  </div>
+
+  <h2>The problem</h2>
+  <p>[ What did the product need to do? What were the constraints — power, real-time, cost, certification? ]</p>
+
+  <h2>What I built</h2>
+  <ul>
+    <li>[ Key thing you owned: driver, bootloader, BSP layer, OTA pipeline... ]</li>
+    <li>[ Another contribution ]</li>
+    <li>[ Another contribution ]</li>
+  </ul>
+
+  <h2>Outcome</h2>
+  <p>[ Result in concrete terms — battery life, boot time, units shipped, bug rate. ]</p>
+</main>
+
+<footer class="footer">
+  <span>&copy; <span id="year"></span></span>
+  <span class="footer-meta">case study · draft</span>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
