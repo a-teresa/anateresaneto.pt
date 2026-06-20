@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AuraScope · Step 09 — Live dashboard</title>
+<meta name="description" content="Step 09 of AuraScope: A lightweight userspace UI consuming both the char driver and the eBPF data." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../assets/style.css" />
+<style>
+  .case { max-width: 760px; margin: 0 auto; padding: 60px 24px 90px; }
+  .back { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
+  .back:hover { color: var(--accent); }
+  .crumb { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  .crumb a { color: var(--muted); text-decoration: none; }
+  .crumb a:hover { color: var(--accent); }
+  .case h1 { font-size: clamp(1.8rem, 4.5vw, 2.6rem); letter-spacing: -1px; margin: 10px 0 12px; }
+  .case .meta { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-bottom: 36px; }
+  .case h2 { font-size: 1.25rem; margin: 38px 0 12px; }
+  .case p { color: #b7bcc4; margin-bottom: 14px; }
+  .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
+  .case li { margin-bottom: 6px; }
+  .tagline {
+    display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    background: var(--accent-dim); color: var(--accent);
+    padding: 4px 10px; border-radius: 3px; margin-bottom: 18px;
+  }
+  pre.code {
+    font-family: var(--mono); font-size: 12px; line-height: 1.5; color: #cdd6e0;
+    background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px; overflow-x: auto; margin: 8px 0 16px;
+  }
+  .note {
+    border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
+  }
+  .stepnav {
+    display: flex; justify-content: space-between; gap: 12px; margin-top: 50px;
+    border-top: 1px solid var(--line); padding-top: 24px;
+  }
+  .stepnav a { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
+  .stepnav a:hover { color: var(--accent); }
+  .stepnav .disabled { opacity: .35; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="grid-overlay" aria-hidden="true"></div>
+
+<header class="topbar">
+  <span class="logo">0x<span class="logo-accent">init</span></span>
+  <nav class="nav"><a href="../aurascope.html">← AuraScope</a></nav>
+</header>
+
+<main class="case">
+  <p class="crumb"><a href="../../index.html#work">work</a> / <a href="../aurascope.html">aurascope</a> / step 09</p>
+
+  <span class="tagline">STEP 09 · TAG v0.9-dashboard</span>
+  <h1>Live dashboard</h1>
+  <p class="meta">// phase 3 · observability · status: planned · published [date]</p>
+
+  <h2>The goal of this step</h2>
+  <p>A lightweight userspace UI consuming both the char driver and the eBPF data.</p>
+
+  <h2>What I did</h2>
+  <ul>
+    <li>[ first concrete thing ]</li>
+    <li>[ second concrete thing ]</li>
+    <li>[ third concrete thing ]</li>
+  </ul>
+
+  <h2>The tricky part</h2>
+  <p>[ The one thing that actually cost time. Be specific and honest — this is the section readers remember. ]</p>
+
+  <pre class="code"># [ the handful of commands / code that matter — keep it copy-pasteable ]</pre>
+
+  <div class="note"><strong>Honest note:</strong> [ anything simulated, stubbed, or deferred at this stage — state it plainly. ]</div>
+
+  <h2>Result</h2>
+  <p>[ The concrete, verifiable win for this step, and what it unlocks for the next one. ]</p>
+
+  <h2>Code</h2>
+  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa">v0.9-dashboard</a>.</p>
+
+  <nav class="stepnav">
+    <a href="step-08.html">← previous</a>
+    <a href="../aurascope.html">all steps</a>
+    <a href="step-10.html">next: full integration →</a>
+  </nav>
+</main>
+
+<footer class="footer">
+  <span>&copy; <span id="year"></span></span>
+  <span class="footer-meta">aurascope · step 09</span>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

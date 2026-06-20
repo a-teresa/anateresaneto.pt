@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
 <div class="grid-overlay" aria-hidden="true"></div>
@@ -37,9 +37,9 @@
       <span class="accent">closest to the metal.</span>
     </h1>
     <p class="hero-sub">
-      Firmware &amp; embedded engineer. I build reliable systems on
-      <strong>Zephyr RTOS</strong> and ship production Linux images with
-      <strong>Yocto</strong> — from board bring-up to OTA.
+      Firmware engineer specializing in IoT and BLE audio — I build
+      production-ready embedded systems on <strong>Zephyr RTOS</strong> and
+      ship Linux images with <strong>Yocto</strong>, from board bring-up to OTA.
     </p>
     <div class="hero-actions">
       <a href="#work" class="btn btn-primary">View work</a>
@@ -59,23 +59,24 @@
   <section class="section" id="work">
     <div class="section-head">
       <h2 class="section-title">Selected work</h2>
-      <span class="section-meta">/* more landing soon */</span>
+      <span class="section-meta">/* built in public, step by step */</span>
     </div>
 
     <div class="cards">
-      <!-- TEMPLATE CARD — duplicate this block per project -->
-      <a class="card" href="projects/project-template.html">
+      <!-- LEAD PROJECT: AuraScope -->
+      <a class="card card-feature" href="projects/aurascope.html">
         <div class="card-top">
           <span class="card-addr">0x01</span>
-          <span class="card-status wip">WIP</span>
+          <span class="card-status wip">BUILDING</span>
         </div>
-        <h3 class="card-title">Project name</h3>
-        <p class="card-desc">One sentence on what the device did and the hard part you owned.</p>
+        <h3 class="card-title">AuraScope</h3>
+        <p class="card-desc">An Auracast BLE-audio receiver that enumerates as a USB sound card on a Zynq-7000 (Arty Z7-20), running a custom Yocto image — with the audio pipeline made observable from inside the kernel (a char driver I wrote) and from outside (eBPF). Built and documented as a public series of small, shippable steps.</p>
         <ul class="tags">
-          <li>Zephyr</li><li>nRF52</li><li>BLE</li>
+          <li>Zephyr</li><li>nRF5340</li><li>Auracast</li><li>Yocto</li><li>eBPF</li><li>kernel</li>
         </ul>
       </a>
 
+      <!-- Future project slots -->
       <a class="card" href="projects/project-template.html">
         <div class="card-top">
           <span class="card-addr">0x02</span>
@@ -158,9 +159,9 @@
     <h2 class="section-title">Let's build something</h2>
     <p class="contact-sub">Open to embedded firmware roles and contract work.</p>
     <div class="contact-links">
-      <a href="mailto:you@example.com" class="btn btn-primary">you@example.com</a>
-      <a href="https://github.com/yourusername" class="btn btn-ghost">GitHub</a>
-      <a href="https://linkedin.com/in/yourusername" class="btn btn-ghost">LinkedIn</a>
+      <a href="mailto:teresa.mdneto@gmail.com" class="btn btn-primary">teresa.mdneto@gmail.com</a>
+      <a href="https://github.com/a-teresa" class="btn btn-ghost">GitHub</a>
+      <a href="https://www.linkedin.com/in/ana-teresa-n-5a11961a3/" class="btn btn-ghost">LinkedIn</a>
     </div>
   </section>
 </main>
@@ -170,6 +171,6 @@
   <span class="footer-meta">v0.1.0 · last commit pending</span>
 </footer>
 
-<script src="main.js"></script>
+<script src="assets/main.js"></script>
 </body>
 </html>
