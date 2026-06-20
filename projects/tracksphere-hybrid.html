@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TrackSphere Hybrid — Portfolio</title>
+<meta name="description" content="A hybrid UWB/BLE tracking system with on-device edge AI, targeting the Arty Z7-20 (Zynq-7000)." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/style.css" />
+<style>
+  .case { max-width: 760px; margin: 0 auto; padding: 60px 24px 90px; }
+  .back { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
+  .back:hover { color: var(--accent); }
+  .case h1 { font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -1px; margin: 28px 0 14px; }
+  .case .meta { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-bottom: 40px; }
+  .case h2 { font-size: 1.3rem; margin: 38px 0 12px; }
+  .case p { color: #b7bcc4; margin-bottom: 14px; }
+  .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
+  .case li { margin-bottom: 6px; }
+  .specs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line);
+           border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin: 30px 0; }
+  .spec { background: var(--bg-elev); padding: 16px 18px; }
+  .spec span { font-family: var(--mono); font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .spec strong { font-weight: 600; }
+  .pill {
+    display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    background: var(--accent-dim); color: var(--accent); padding: 4px 10px; border-radius: 3px; margin-bottom: 18px;
+  }
+  .ext { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="grid-overlay" aria-hidden="true"></div>
+
+<header class="topbar">
+  <span class="logo">0x<span class="logo-accent">init</span></span>
+  <nav class="nav"><a href="../index.html#work">← all work</a></nav>
+</header>
+
+<main class="case">
+  <a class="back" href="../index.html#work">← back to work</a>
+  <span class="pill">EDGE AI · IN PROGRESS</span>
+  <h1>TrackSphere Hybrid</h1>
+  <p class="meta">// personal project · edge AI · in progress</p>
+
+  <div class="specs">
+    <div class="spec"><span>DOMAIN</span><strong>Hybrid UWB / BLE tracking</strong></div>
+    <div class="spec"><span>COMPUTE</span><strong>Edge AI · on-device inference</strong></div>
+    <div class="spec"><span>HARDWARE</span><strong>Arty Z7-20 · Zynq-7000</strong></div>
+    <div class="spec"><span>STATUS</span><strong>In progress</strong></div>
+  </div>
+
+  <h2>The problem</h2>
+  <p>
+    Assets vanish from the data the moment they move. GPS dies indoors, Wi-Fi
+    covers only some buildings, and indoor RTLS stops at the door. No single
+    system follows a tool or order from the assembly line, across the yard, onto
+    a truck, to the customer — so teams fall back on manual counts and bleed hours
+    chasing missing equipment.
+  </p>
+
+  <h2>The idea</h2>
+  <p>
+    TrackSphere Hybrid is a tracking system designed to follow an asset across
+    those broken boundaries — indoor to outdoor, stationary to in-transit — by
+    fusing complementary radios instead of relying on any one of them. UWB gives
+    precise indoor range, BLE gives presence and connectivity, and the gaps GPS or
+    Wi-Fi leave are bridged rather than fallen through. The interpretation happens
+    <em>on the device</em> via edge AI, so a track survives even where the network
+    doesn't, and raw location data stays local.
+  </p>
+
+  <h2>Main goals</h2>
+  <ul>
+    <li>Maintain a continuous track of an asset across indoor, yard, and in-transit zones — no handoff gap where the asset "disappears."</li>
+    <li>Fuse UWB range and BLE signals into a robust position estimate that degrades gracefully when one radio drops.</li>
+    <li>Run inference at the edge — interpret motion and location on-device, keeping latency low and raw data local.</li>
+    <li>Target the <strong>Arty Z7-20 (Zynq-7000)</strong> as the edge compute platform, using the PS for the pipeline and leaving room for PL acceleration.</li>
+  </ul>
+
+  <h2>In to come</h2>
+  <p>
+    This is an active edge-AI build. The interactive pitch deck below lays out the
+    concept; the engineering write-up — the UWB/BLE fusion, the model, and how
+    inference maps onto the Zynq — will be filled in as the work lands.
+  </p>
+
+  <h2>Links</h2>
+  <p>Pitch deck: <a class="ext" href="https://a-teresa.github.io/trackSphereHybrid/">a-teresa.github.io/trackSphereHybrid</a></p>
+</main>
+
+<footer class="footer">
+  <span>&copy; <span id="year"></span></span>
+  <span class="footer-meta">case study · in progress</span>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

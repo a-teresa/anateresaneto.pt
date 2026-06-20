@@ -77,15 +77,15 @@
       </a>
 
       <!-- Future project slots -->
-      <a class="card" href="projects/project-template.html">
+      <a class="card" href="projects/tracksphere-hybrid.html">
         <div class="card-top">
           <span class="card-addr">0x02</span>
-          <span class="card-status wip">WIP</span>
+          <span class="card-status wip">EDGE AI · WIP</span>
         </div>
-        <h3 class="card-title">Project name</h3>
-        <p class="card-desc">One sentence on the Yocto image / BSP you built and why it mattered.</p>
+        <h3 class="card-title">TrackSphere Hybrid</h3>
+        <p class="card-desc">A hybrid tracking system that follows an asset across the gaps where GPS, Wi-Fi and indoor RTLS each fail — fusing UWB and BLE, with edge-AI inference on a Zynq-7000 (Arty Z7-20) so a track survives even where the network doesn't.</p>
         <ul class="tags">
-          <li>Yocto</li><li>i.MX8</li><li>Linux</li>
+          <li>Edge AI</li><li>UWB</li><li>Arty Z7-20</li><li>Zephyr</li>
         </ul>
       </a>
 
@@ -118,12 +118,22 @@
     <div class="about-grid">
       <p class="about-lead">
         I'm a firmware / embedded engineer focused on making constrained
-        hardware do reliable, useful things.
+        hardware do reliable, useful things — from BLE audio on nRF53 to
+        Yocto-based Linux on ARM.
       </p>
       <p class="about-body">
-        [ Replace this with your story — years of experience, the kinds of
-        devices you've worked on, what you care about (low power, real-time
-        guarantees, secure boot, maintainable BSPs). Keep it specific. ]
+        In my current role I work on Bluetooth applications on the nRF5340 with a
+        focus on real-time audio transmission — BLE and BLE audio across UART, USB,
+        SPI and I²S on Zephyr RTOS in C/C++ — alongside Yocto-based embedded Linux.
+        Earlier I worked across the full IoT stack: bare-metal and FreeRTOS firmware
+        for STM32F4/F7, customized embedded Linux images with Yocto, and the systems
+        built around them — including a C++ access-control service on embedded Linux
+        tying together MongoDB change streams and Kafka, plus the web and cloud
+        deployment behind it. I've also shipped FOTA over SMP, a custom ESP32 mesh,
+        and UWB ranging on DW3000-class modules. I hold an MSc from Instituto
+        Superior Técnico and have a published paper on running multilabel anomaly
+        detection on microcontrollers. I care about real-time guarantees, clean
+        board bring-up, and BSPs that the next engineer can actually maintain.
       </p>
     </div>
   </section>
@@ -145,7 +155,7 @@
       </div>
       <div class="stack-col">
         <h4>Hardware &amp; buses</h4>
-        <ul><li>ARM Cortex-M / A</li><li>I²C · SPI · UART</li><li>BLE · LoRa</li><li>JTAG / SWD</li></ul>
+        <ul><li>nRF53 · STM32F4/F7 · ESP32</li><li>I²C · SPI · UART · I²S · USB</li><li>BLE · UWB (DW3000)</li><li>JTAG / SWD</li></ul>
       </div>
       <div class="stack-col">
         <h4>Tooling</h4>
