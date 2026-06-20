@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>TrackSphere Hybrid — Portfolio</title>
-<meta name="description" content="A hybrid UWB/BLE tracking system with on-device edge AI, targeting the Arty Z7-20 (Zynq-7000)." />
+<meta name="description" content="A hybrid UWB/BLE tracking system that follows assets across indoor, yard and in-transit zones without losing the track." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -41,14 +41,14 @@
 
 <main class="case">
   <a class="back" href="../index.html#work">← back to work</a>
-  <span class="pill">EDGE AI · IN PROGRESS</span>
+  <span class="pill">IN PROGRESS</span>
   <h1>TrackSphere Hybrid</h1>
-  <p class="meta">// personal project · edge AI · in progress</p>
+  <p class="meta">// personal project · in progress</p>
 
   <div class="specs">
     <div class="spec"><span>DOMAIN</span><strong>Hybrid UWB / BLE tracking</strong></div>
-    <div class="spec"><span>COMPUTE</span><strong>Edge AI · on-device inference</strong></div>
-    <div class="spec"><span>HARDWARE</span><strong>Arty Z7-20 · Zynq-7000</strong></div>
+    <div class="spec"><span>RADIOS</span><strong>UWB (DW3000) + BLE</strong></div>
+    <div class="spec"><span>APPROACH</span><strong>Sensor fusion · seamless handoff</strong></div>
     <div class="spec"><span>STATUS</span><strong>In progress</strong></div>
   </div>
 
@@ -67,24 +67,23 @@
     those broken boundaries — indoor to outdoor, stationary to in-transit — by
     fusing complementary radios instead of relying on any one of them. UWB gives
     precise indoor range, BLE gives presence and connectivity, and the gaps GPS or
-    Wi-Fi leave are bridged rather than fallen through. The interpretation happens
-    <em>on the device</em> via edge AI, so a track survives even where the network
-    doesn't, and raw location data stays local.
+    Wi-Fi leave are bridged rather than fallen through — so a single track follows
+    the asset from the assembly line, across the yard, onto a truck, to the customer.
   </p>
 
   <h2>Main goals</h2>
   <ul>
     <li>Maintain a continuous track of an asset across indoor, yard, and in-transit zones — no handoff gap where the asset "disappears."</li>
     <li>Fuse UWB range and BLE signals into a robust position estimate that degrades gracefully when one radio drops.</li>
-    <li>Run inference at the edge — interpret motion and location on-device, keeping latency low and raw data local.</li>
-    <li>Target the <strong>Arty Z7-20 (Zynq-7000)</strong> as the edge compute platform, using the PS for the pipeline and leaving room for PL acceleration.</li>
+    <li>Hand off cleanly between zones (indoor RTLS → yard → in-transit) without the asset disappearing from the data.</li>
+    <li>Replace manual counts with a continuous, queryable location record.</li>
   </ul>
 
   <h2>In to come</h2>
   <p>
-    This is an active edge-AI build. The interactive pitch deck below lays out the
-    concept; the engineering write-up — the UWB/BLE fusion, the model, and how
-    inference maps onto the Zynq — will be filled in as the work lands.
+    This is an active build. The interactive pitch deck below lays out the
+    concept; the engineering write-up — the UWB/BLE fusion and the cross-zone
+    handoff — will be filled in as the work lands.
   </p>
 
   <h2>Links</h2>
