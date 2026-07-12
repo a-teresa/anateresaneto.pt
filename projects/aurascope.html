@@ -62,6 +62,15 @@
   .step-tag.bonus { background: #241b33; color: #b794f4; }
 
   .legend { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 10px; }
+
+  .progress-cta {
+    display: block; background: var(--bg-elev); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 14px 18px; margin: 30px 0; text-decoration: none;
+    transition: border-color .2s;
+  }
+  .progress-cta:hover { border-color: var(--accent); }
+  .progress-cta strong { display: block; color: var(--accent); font-size: .95rem; margin-bottom: 3px; }
+  .progress-cta span { font-size: .85rem; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -113,6 +122,11 @@
     <li><strong>A kernel module I actually wrote</strong> — file_operations, ioctls, sysfs, and correct locking.</li>
     <li><strong>eBPF on embedded Linux</strong> — the same data the driver owns, observed from the outside, so you see the tradeoff between the two approaches.</li>
   </ul>
+
+  <a class="progress-cta" href="aurascope/progress.html">
+    <strong>→ Where things stand</strong>
+    <span>An honest, running progress log for Phase 1 — what's actually built and verified vs. what's still ahead.</span>
+  </a>
 
   <h2>The build, step by step</h2>
   <p>Each step links to its own write-up as it ships. Greyed steps are planned but not yet published.</p>
@@ -226,7 +240,7 @@
 
   <h2>Repo</h2>
   <p>
-    Source and tagged history: <a class="back" href="https://github.com/a-teresa" style="color:var(--accent)">github.com/a-teresa</a> &nbsp;<span style="color:var(--muted)">(repo link to be set)</span>
+    Source and tagged history: <a class="back" href="https://github.com/a-teresa/aurascope" style="color:var(--accent)">github.com/a-teresa/aurascope</a>
   </p>
 </main>
 

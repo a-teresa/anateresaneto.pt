@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AuraScope · Where things stand — Phase 1</title>
+<meta name="description" content="A first-person progress log on AuraScope's Phase 1: defining the hardware in Vivado, getting Yocto to consume it, and what's still ahead." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../assets/style.css" />
+<style>
+  .case { max-width: 760px; margin: 0 auto; padding: 60px 24px 90px; }
+  .crumb { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  .crumb a { color: var(--muted); text-decoration: none; }
+  .crumb a:hover { color: var(--accent); }
+  .case h1 { font-size: clamp(1.8rem, 4.5vw, 2.6rem); letter-spacing: -1px; margin: 10px 0 12px; }
+  .case .meta { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+  .case h2 { font-size: 1.2rem; margin: 34px 0 12px; }
+  .case p { color: #b7bcc4; margin-bottom: 14px; }
+  .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
+  .case li { margin-bottom: 6px; }
+  .case code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; color: var(--accent); }
+
+  /* --- legend --- */
+  .legend {
+    display: flex; gap: 24px; flex-wrap: wrap; font-family: var(--mono); font-size: 12.5px;
+    color: var(--muted); background: var(--bg-elev); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 12px 16px; margin: 20px 0 32px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .dot.done { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .dot.next { border: 1.5px solid var(--muted); background: transparent; }
+
+  /* --- status rail: a left border + tint that runs the whole section --- */
+  .status-block {
+    border-left: 3px solid var(--line);
+    padding: 4px 0 4px 20px;
+    margin: 22px 0;
+  }
+  .status-block.done { border-left-color: var(--accent); }
+  .status-block.next { border-left-color: var(--muted); border-left-style: dashed; }
+
+  .status-tag {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    padding: 3px 10px; border-radius: 3px; margin-bottom: 10px;
+  }
+  .status-tag.done { background: var(--accent-dim); color: var(--accent); }
+  .status-tag.next { background: var(--bg-elev); color: var(--muted); border: 1px solid var(--line); }
+
+  .status-block h3 { font-size: 1.05rem; margin: 0 0 8px; color: var(--text); }
+  .status-block.next h3 { color: var(--muted); }
+  .status-block.next p { color: #8a919c; }
+
+  .note {
+    border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
+  }
+</style>
+</head>
+<body>
+<div class="grid-overlay" aria-hidden="true"></div>
+
+<header class="topbar">
+  <span class="logo">0x<span class="logo-accent">init</span></span>
+  <nav class="nav"><a href="../aurascope.html">← AuraScope</a></nav>
+</header>
+
+<main class="case">
+  <p class="crumb"><a href="../../index.html#work">work</a> / <a href="../aurascope.html">aurascope</a> / progress</p>
+
+  <h1>Where things stand</h1>
+  <p class="meta">// Phase 1 · foundation · updated <span id="updated"></span></p>
+
+  <p>
+    I'm building AuraScope in public, step by step, and this page is where
+    I'll keep an honest running account of what's actually done versus
+    what's still ahead. Green means built, verified, and tagged. Grey means
+    planned but not started. Nothing here is aspirational — if it's marked
+    done, I've run it myself and checked the output.
+  </p>
+
+  <div class="legend">
+    <span><span class="dot done"></span> done &amp; verified</span>
+    <span><span class="dot next"></span> planned, not yet started</span>
+  </div>
+
+  <h2>The hardware, first</h2>
+  <p>
+    AuraScope's audio path doesn't actually need any FPGA fabric — that
+    part runs over USB. But the very first thing I wanted working on the
+    board was an LED that reflects whether audio is playing, and the
+    Arty Z7-20's LEDs are wired to the fabric, not directly to the
+    processor. So before Linux, before any driver code, I needed a real
+    hardware design.
+  </p>
+
+  <div class="status-block done">
+    <span class="status-tag done">✓ DONE — v0.1</span>
+    <h3>Defining the hardware in Vivado</h3>
+    <p>
+      I built the block design — the Zynq processor plus GPIO peripherals
+      for the LED and buttons — generated the HDL wrapper, and wrote the
+      constraints. When I went to export the hardware, Vivado refused:
+      <em>"cannot write hardware definition file — no generated IPI
+      blocks."</em> My first instinct was that I'd typed the export command
+      wrong. I hadn't. Checking the project's actual run status told the
+      real story — nothing had ever been synthesized. The wrapper and
+      constraints existed, the project looked finished, and none of it had
+      actually been built yet. I launched synthesis and implementation
+      properly and got a real bitstream.
+    </p>
+    <p>
+      Before writing any device-tree code, I had a plan in my head for how
+      the LEDs were wired: through EMIO, the standard PS-to-fabric GPIO
+      route. Reasonable assumption. Instead of building on it, I unzipped
+      the exported hardware file and checked. Vivado's own automation
+      hadn't used EMIO at all — it had used two separate AXI GPIO cores, a
+      different, equally valid approach, sitting at addresses I could read
+      directly out of the file. Nothing was broken. My assumption just
+      wasn't what got built, and I caught it before it cost me anything
+      downstream.
+    </p>
+    <p>
+      What I ended up with: a verified <code>.xsa</code> — a real
+      bitstream, real hardware handoff data, real processor-init data, all
+      confirmed present rather than assumed.
+    </p>
+  </div>
+
+  <h2>Getting Yocto to consume it</h2>
+  <div class="status-block done">
+    <span class="status-tag done">✓ DONE — v0.1</span>
+    <h3>Yocto setup — and a real dependency maze</h3>
+    <p>
+      This is the part that took longest, and it wasn't a single bug — it
+      was a wrong turn at the tooling level. I matched my Yocto release to
+      a Xilinx layer branch (confirmed against what each layer actually
+      declares, not just what a README claims), and started registering
+      layers. Each one kept surfacing a dependency I hadn't added yet,
+      which is normal for a real board support package — until I followed
+      a deprecated layer's own advice toward what's now AMD's recommended
+      migration path, and watched it cascade four layers deep into
+      virtualization, TPM, and security infrastructure that has nothing to
+      do with getting Linux to boot on a small board with two GPIO cores.
+    </p>
+    <p>
+      I stepped back. Rather than keep pulling in unrelated infrastructure
+      because a deprecated README pointed there, I checked whether the
+      older, simpler tool for consuming a <code>.xsa</code> directly was
+      still around. It was — deprecated, but fully functional. After
+      tracking down one missing dependency (a submodule that needed
+      initializing) and one confusing tool-path issue (an argument that
+      wanted an installation root, not the binary path I'd correctly
+      located), it worked: a real Yocto machine, generated directly from
+      my own verified hardware.
+    </p>
+  </div>
+
+  <div class="note">
+    <strong>The honest lesson from this phase:</strong> the tool that's
+    officially recommended isn't always the one that fits the job. Twice
+    in Phase 1 — once catching an unverified hardware assumption, once
+    recognizing an overbuilt dependency chain — the right move was
+    stopping to check rather than pushing forward on momentum.
+  </div>
+
+  <h2>What's still ahead</h2>
+
+  <div class="status-block next">
+    <span class="status-tag next">○ PLANNED</span>
+    <h3>First boot</h3>
+    <p>Wiring the generated machine into the build, flashing the board, and reaching a login prompt for the first time.</p>
+  </div>
+
+  <div class="status-block next">
+    <span class="status-tag next">○ PLANNED</span>
+    <h3>Custom image &amp; recipe</h3>
+    <p>My own Yocto layer and recipe, deploying software I wrote onto the image.</p>
+  </div>
+
+  <div class="status-block next">
+    <span class="status-tag next">○ PLANNED</span>
+    <h3>Audio-status LED</h3>
+    <p>Exposing the AXI GPIO core from the hardware step as a Linux LED, driven by a small daemon — blink on audio, solid on silence.</p>
+  </div>
+
+  <div class="status-block next">
+    <span class="status-tag next">○ PLANNED</span>
+    <h3>Beyond Phase 1</h3>
+    <p>Wireless audio over Auracast into the board as a USB sound card, then a kernel character driver and eBPF tracing side by side for observability, then full integration — with an optional bonus phase moving the audio path onto the FPGA fabric itself.</p>
+  </div>
+
+  <p style="margin-top:36px; color:#8a919c; font-size:.9rem;">
+    I'll update this page as each step lands. Full technical write-ups for
+    the completed steps are linked from the <a href="../aurascope.html" style="color:var(--accent)">AuraScope project page</a>.
+    The raw, unedited notes behind this page live in the repo: <a href="https://github.com/a-teresa/aurascope/blob/main/docs/notes/phase1-log.md" style="color:var(--accent)">docs/notes/phase1-log.md</a>.
+  </p>
+</main>
+
+<footer class="footer">
+  <span>&copy; <span id="year"></span></span>
+  <span class="footer-meta">aurascope · progress</span>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+  document.getElementById('updated').textContent = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+</script>
+</body>
+</html>
