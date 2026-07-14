@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AuraScope · Step 01 — Yocto on the Arty Z7-20</title>
-<meta name="description" content="Step 1 of AuraScope: building a minimal custom Yocto image that boots on the Arty Z7-20 (Zynq-7000)." />
+<title>AuraScope · Step 01 — Yocto setup &amp; the dependency maze</title>
+<meta name="description" content="Step 01 of AuraScope: matched branches, a dependency chain that cascaded into AMD's SDT stack, stepping back, and generating a Yocto machine from the real exported .xsa." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -22,6 +22,8 @@
   .case p { color: #b7bcc4; margin-bottom: 14px; }
   .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
   .case li { margin-bottom: 6px; }
+  .case code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; color: var(--accent); }
   .tagline {
     display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
     background: var(--accent-dim); color: var(--accent); padding: 4px 10px; border-radius: 3px; margin-bottom: 18px;
@@ -31,17 +33,26 @@
     background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 16px; overflow-x: auto; margin: 8px 0 16px;
   }
+  pre.code .c { color: #6f7785; }
+  pre.code .out { color: #7fb88a; }
+  pre.code .err { color: #d98a8a; }
   .note {
     border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
     border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
+  }
+  .deadend {
+    border-left: 3px solid #b05050; background: #1a1212; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #e0bcbc; font-size: .92rem; margin: 16px 0;
+  }
+  .find {
+    border-left: 3px solid var(--accent); background: #0f1a14; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #cfe8d6; font-size: .92rem; margin: 16px 0;
   }
   .stepnav {
     display: flex; justify-content: space-between; gap: 12px; margin-top: 50px;
     border-top: 1px solid var(--line); padding-top: 24px;
   }
-  .stepnav a {
-    font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none;
-  }
+  .stepnav a { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
   .stepnav a:hover { color: var(--accent); }
   .stepnav .disabled { opacity: .35; pointer-events: none; }
 </style>
@@ -57,41 +68,162 @@
 <main class="case">
   <p class="crumb"><a href="../../index.html#work">work</a> / <a href="../aurascope.html">aurascope</a> / step 01</p>
 
-  <span class="tagline">STEP 01 · TAG v0.1-yocto-boot</span>
-  <h1>Yocto on the Arty Z7-20</h1>
-  <p class="meta">// phase 1 · foundation · published [date]</p>
+  <span class="tagline">STEP 01 · TAG v0.1 · DONE</span>
+  <h1>Yocto setup &amp; the dependency maze</h1>
+  <p class="meta">// phase 1 · foundation · Yocto 5.0 "Scarthgap" · meta-xilinx rel-v2025.2</p>
 
-  <h2>The goal of this step</h2>
+  <h2>The goal</h2>
   <p>
-    One small, verifiable win: a minimal custom Yocto image that boots to a login prompt on the
-    Arty Z7-20 (Zynq-7000). Nothing fancy yet — the point is to stand up the build system and
-    prove the board comes up, because everything else in AuraScope sits on top of this.
+    Take the verified <code>.xsa</code> from the hardware step and turn it into a real Yocto
+    machine — a named, reproducible build target generated directly from this project's own
+    hardware description, not a generic or community board definition.
   </p>
 
-  <h2>What I did</h2>
-  <ul>
-    <li>[ Chose pure Yocto + <code>meta-xilinx</code> vs. PetaLinux — and why. ]</li>
-    <li>[ Set up the layers and a minimal image target. ]</li>
-    <li>[ Built FSBL / bitstream / u-boot / kernel / rootfs into a boot image. ]</li>
-    <li>[ Flashed to SD, booted, confirmed serial console + login. ]</li>
-  </ul>
+  <h2>Matching the branches first</h2>
+  <p>
+    Rather than guess a branch, I listed what actually exists upstream before cloning anything:
+  </p>
+  <pre class="code">git ls-remote --heads https://github.com/Xilinx/meta-xilinx | grep rel-v</pre>
+  <p>
+    <code>rel-v2025.2</code> matches the Vivado version used to produce the <code>.xsa</code>.
+    But a branch existing isn't the same as it being compatible with the Yocto release already
+    chosen (Scarthgap). The authoritative check is what each sub-layer declares about itself —
+    not the README:
+  </p>
+  <pre class="code">git clone -b rel-v2025.2 https://github.com/Xilinx/meta-xilinx
+find . -name "layer.conf" -exec grep -H "LAYERSERIES_COMPAT" {} \;</pre>
+  <pre class="code"><span class="out">./meta-xilinx-core/conf/layer.conf:LAYERSERIES_COMPAT_xilinx = "scarthgap"
+./meta-xilinx-bsp/conf/layer.conf:LAYERSERIES_COMPAT_xilinx-bsp = "scarthgap"
+<span class="c">... (every sub-layer, same result)</span></span></pre>
+  <p>Confirmed. Branch locked in before writing anything that depended on it.</p>
 
-  <h2>The tricky part</h2>
-  <p>[ The one thing that actually cost time — a clock config, a missing device-tree node,
-     a bitstream/u-boot mismatch. This is the section readers remember; be specific and honest. ]</p>
+  <h2>Registering layers — a cascade, not a list</h2>
+  <p>
+    What looked like "add five layers" turned into a round of dependency errors, each one
+    naming a layer I hadn't added yet:
+  </p>
+  <pre class="code">bitbake-layers add-layer ../meta-arm/meta-arm</pre>
+  <pre class="code"><span class="err">ERROR: Layer 'meta-arm' depends on layer 'arm-toolchain', but this layer is not enabled</span></pre>
+  <p>
+    <code>meta-arm</code> is a multi-layer repo — its toolchain sub-layer has to go in first.
+    Fixed that, then hit the next one:
+  </p>
+  <pre class="code">bitbake-layers add-layer ../meta-xilinx/meta-xilinx-core</pre>
+  <pre class="code"><span class="err">ERROR: Layer 'xilinx' depends on layer 'meta-arm', but this layer is not enabled</span></pre>
+  <p>
+    This confirmed that <code>meta-arm</code> isn't optional — <code>meta-xilinx-core</code>
+    genuinely requires it (for the ARM Trusted Firmware / secure-boot plumbing under the Zynq
+    boot chain). Once both were in, everything else registered cleanly.
+  </p>
 
-  <pre class="code"># [ the handful of commands that matter — keep it copy-pasteable ]
-git clone ...
-source oe-init-build-env
-bitbake core-image-minimal</pre>
+  <h2>The dead end: following a deprecated layer's own advice</h2>
+  <p>
+    Once the layers were registered I noticed <code>meta-xilinx-bsp</code>'s own README:
+  </p>
+  <pre class="code"><span class="out">This layer is deprecated. All BSP components have been moved to other layers.
+SDT based machines are in meta-amd-adaptive-socs-bsps.</span></pre>
+  <p>
+    Reasonable to follow that pointer. I cloned <code>meta-amd-adaptive-socs</code> and tried
+    registering it. Each fix surfaced a new, deeper dependency rather than terminating:
+  </p>
+  <pre class="code"><span class="err">ERROR: depends on 'xilinx-microblaze', 'xilinx-standalone', 'xilinx-standalone-sdt'
+ERROR: 'xilinx-standalone-sdt' depends on 'virtualization-layer'
+ERROR: 'xilinx-virtualization' depends on 'security', 'tpm-layer', 'virtualization-layer'</span></pre>
 
-  <div class="note"><strong>Honest note:</strong> [ anything simulated, stubbed, or not-yet-ideal at this stage — state it plainly. ]</div>
+  <div class="deadend">
+    <strong>Where this led:</strong> SDT machine → standalone-sdt → virtualization → security +
+    TPM. Four levels deep, each new layer belonging to a separate upstream project that would
+    need cloning fresh. Virtualization and TPM infrastructure has nothing to do with booting
+    Linux on a Zynq-7020 with two GPIO cores.
+  </div>
 
-  <h2>Result</h2>
-  <p>[ Boots in N seconds to a prompt; image size; what works and what's deliberately left for later. ]</p>
+  <p>
+    I stepped back rather than keep pulling in unrelated infrastructure because a deprecated
+    README pointed there. The question was whether the older, simpler tool for consuming a
+    <code>.xsa</code> directly was still around.
+  </p>
+  <pre class="code"><span class="c"># revert the entire detour</span>
+bitbake-layers remove-layer '*/meta-amd-adaptive-socs-bsp'
+bitbake-layers remove-layer '*/meta-amd-adaptive-socs-core'
+bitbake-layers remove-layer '*/meta-xilinx-standalone-sdt'
+bitbake-layers remove-layer '*/meta-xilinx-virtualization'</pre>
+
+  <h2>What actually worked: gen-machineconf</h2>
+  <p>
+    <code>meta-xilinx-core</code> still ships <code>gen-machineconf</code> — a standalone Python
+    tool that consumes a <code>.xsa</code> directly. It was a git submodule that hadn't been
+    initialized:
+  </p>
+  <pre class="code">cd meta-xilinx
+git submodule status
+<span class="err">-e1bc2ac3... meta-xilinx-core/gen-machine-conf</span>  <span class="c"># leading '-' = uninitialized</span>
+
+git submodule update --init --recursive</pre>
+
+  <p>
+    The tool's own docs confirmed the classic <code>.xsa</code> flow is still present —
+    marked deprecated, but documented and functional. Three attempts to actually run it:
+  </p>
+
+  <pre class="code"><span class="c"># attempt 1 — missing XSCT entirely</span>
+./gen-machineconf --soc-family zynq \
+  --hw-description ~/aurascope-yocto/aurascope/hw/design_2_wrapper.xsa \
+  --machine-name aurascope-arty-z7
+<span class="err">[ERROR] xsct command not found, use --xsct-tool option to specify path</span></pre>
+
+  <pre class="code"><span class="c"># attempt 2 — pointed at the binary, still failed</span>
+./gen-machineconf ... --xsct-tool /opt/2025.2/Vitis/bin/xsct
+<span class="err">[ERROR] XSCT_TOOL path not found: /opt/2025.2/Vitis/bin/xsct</span></pre>
+
+  <div class="note">
+    <strong>The confusing part:</strong> <code>find</code> had confirmed the file exists and
+    is executable. The mismatch was in what <code>--xsct-tool</code> actually expects — not
+    the binary path, but the <strong>installation root directory</strong>.
+  </div>
+
+  <pre class="code"><span class="c"># attempt 3 — installation root, not the binary</span>
+./gen-machineconf --soc-family zynq \
+  --hw-description ~/aurascope-yocto/aurascope/hw/design_2_wrapper.xsa \
+  --machine-name aurascope-arty-z7 \
+  --xsct-tool /opt/2025.2/Vitis
+<span class="out">[INFO] Getting Platform info from HW file
+[INFO] Generating Kconfig for project
+[INFO] Silentconfig project
+[INFO] Generating configuration files
+[INFO] Generating machine conf file
+[NOTE] Add to your local.conf:
+MACHINE = "aurascope-arty-z7"</span></pre>
+
+  <div class="find">
+    <strong>Confirmed:</strong> a Yocto machine generated directly from this project's own
+    verified hardware — the same <code>.xsa</code> that contains <code>axi_gpio_0</code>
+    (switches, <code>0x41200000</code>) and <code>axi_gpio_1</code> (LEDs / buttons,
+    <code>0x41210000</code>), confirmed in the hardware step.
+  </div>
+
+  <h2>One thing worth clarifying</h2>
+  <p>
+    <code>gen-machineconf</code> prints "Starting bitbake server" and looks like a BitBake
+    command. It isn't. It's a standalone Python script that reuses BitBake's config-parsing
+    library internally — it reads the <code>.xsa</code> offline and writes a machine
+    <code>.conf</code> as plain text. No build happens at this step. <code>bitbake</code>
+    proper only enters once the generated machine is wired into <code>local.conf</code> and
+    an image target is actually built.
+  </p>
+
+  <h2>The honest lesson</h2>
+  <p>
+    The officially recommended path isn't always the one that fits the job. The deprecated
+    BSP layer pointed at an SDT migration that pulled in four layers of unrelated
+    infrastructure. Recognizing that and stepping back to a simpler tool that still worked
+    collapsed the whole problem down to a submodule init and a path-format surprise.
+  </p>
 
   <h2>Code</h2>
-  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa">v0.1-yocto-boot</a>.</p>
+  <p>
+    Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope">v0.1</a>
+    · full command-by-command log: <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope/blob/main/docs/notes/phase1-log.md">docs/notes/phase1-log.md</a>
+  </p>
 
   <nav class="stepnav">
     <a class="disabled" href="#">← previous</a>
