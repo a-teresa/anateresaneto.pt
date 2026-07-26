@@ -171,7 +171,7 @@
   <h2>The wireless audio source</h2>
   <div class="status-block done">
     <span class="status-tag done">● DONE</span>
-    <h3>nRF5340 Auracast broadcast bring-up</h3>
+    <h3>nRF5340 Auracast bring-up</h3>
     <p>
       Before any of the Zynq work makes sense, there needs to be something
       to receive. I adapted Nordic's official
@@ -185,6 +185,187 @@
       <a href="https://github.com/a-teresa/broadcast/tree/main/aurascope/aurascope"
          style="color:var(--accent)">github.com/a-teresa/broadcast</a>.
     </p>
+
+
+  <h3 style="font-size:1rem;margin:28px 0 8px;color:var(--text);">System architecture</h3>
+  <div style="margin:0 0 6px;">
+    <svg viewBox="0 0 820 390" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;background:#0d1117;border-radius:8px;border:1px solid #21262d;">
+  <defs>
+    <marker id="ca" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#4ade80"/></marker>
+    <marker id="cb" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#58a6ff"/></marker>
+    <marker id="cp" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#b794f4"/></marker>
+  </defs>
+  <text x="410" y="22" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#6e7681" letter-spacing="1">COMPONENT DIAGRAM · AURASCOPE SYSTEM</text>
+
+  <!-- I2S Mic -->
+  <rect x="20" y="210" width="110" height="40" rx="6" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+  <text x="75" y="228" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="10" font-weight="600" fill="#e6edf3">I2S Mic</text>
+  <text x="75" y="242" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">48kHz PCM</text>
+
+  <!-- nRF5340 GW -->
+  <rect x="20" y="40" width="195" height="155" rx="6" fill="#161b22" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="117" y="58" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11" font-weight="600" fill="#4ade80">nRF5340 Gateway</text>
+  <text x="117" y="71" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">Zephyr / NCS 3.2.99</text>
+  <rect x="32" y="80" width="80" height="20" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="72" y="93" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#e6edf3">I2S driver</text>
+  <rect x="122" y="80" width="80" height="20" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="162" y="93" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#e6edf3">LC3 encoder</text>
+  <rect x="32" y="110" width="170" height="20" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="117" y="123" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#b794f4">BIS source · broadcast_source</text>
+  <rect x="32" y="140" width="170" height="20" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="117" y="153" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">audio_datapath (LOCKED)</text>
+  <rect x="32" y="168" width="170" height="18" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="117" y="180" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="7" fill="#6e7681">MCUboot + FOTA (QSPI)</text>
+
+  <!-- mic → GW arrow -->
+  <line x1="75" y1="210" x2="75" y2="197" stroke="#4ade80" stroke-width="1.5" marker-end="url(#ca)"/>
+
+  <!-- Auracast (BIS) cloud -->
+  <rect x="275" y="82" width="145" height="70" rx="8" fill="#1a1228" stroke="#b794f4" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="347" y="107" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#b794f4">Auracast (BIS)</text>
+  <text x="347" y="121" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">connectionless · no pairing</text>
+  <text x="347" y="134" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">LC3 · 48kHz · 96kbps</text>
+  <!-- GW → BIS -->
+  <line x1="215" y1="118" x2="273" y2="118" stroke="#b794f4" stroke-width="1.5" marker-end="url(#cp)"/>
+
+  <!-- nRF5340 HS -->
+  <rect x="478" y="40" width="195" height="175" rx="6" fill="#161b22" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="575" y="58" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11" font-weight="600" fill="#4ade80">nRF5340 Headset</text>
+  <text x="575" y="71" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">Zephyr / NCS 3.2.99</text>
+  <rect x="490" y="80" width="170" height="20" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="575" y="93" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#b794f4">BIS sink · broadcast_sink</text>
+  <rect x="490" y="110" width="80" height="20" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="530" y="123" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#e6edf3">LC3 decoder</text>
+  <rect x="580" y="110" width="80" height="20" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="620" y="123" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#58a6ff">USB UAC2</text>
+  <rect x="490" y="140" width="170" height="18" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="575" y="152" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">broadcast_sink app</text>
+  <rect x="490" y="166" width="170" height="16" rx="2" fill="#0d1f33" stroke="#58a6ff" stroke-width="1"/>
+  <text x="575" y="177" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="7" fill="#58a6ff">CONFIG_AUDIO_SINK_USB=y  (custom)</text>
+  <rect x="490" y="190" width="170" height="16" rx="2" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="575" y="201" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="7" fill="#6e7681">MCUboot + FOTA (QSPI)</text>
+  <!-- BIS → HS -->
+  <line x1="420" y1="118" x2="476" y2="118" stroke="#b794f4" stroke-width="1.5" marker-end="url(#cp)"/>
+
+  <!-- Linux Host -->
+  <rect x="700" y="40" width="105" height="210" rx="6" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="752" y="58" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11" font-weight="600" fill="#58a6ff">Linux Host</text>
+  <text x="752" y="71" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">Arty Z7-20</text>
+  <rect x="710" y="80" width="85" height="20" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="752" y="93" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#58a6ff">snd-usb-audio</text>
+  <rect x="710" y="110" width="85" height="20" rx="3" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="752" y="123" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#e6edf3">ALSA</text>
+  <rect x="710" y="140" width="85" height="30" rx="3" fill="#0d1117" stroke="#6e7681" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="752" y="153" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">/dev/audiomon</text>
+  <text x="752" y="165" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="7" fill="#6e7681">char driver</text>
+  <rect x="710" y="180" width="85" height="30" rx="3" fill="#0d1117" stroke="#6e7681" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="752" y="193" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">eBPF probes</text>
+  <text x="752" y="205" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="7" fill="#6e7681">kprobes</text>
+  <rect x="710" y="220" width="85" height="20" rx="3" fill="#0d1117" stroke="#6e7681" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="752" y="233" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">dashboard</text>
+  <!-- HS → Linux USB -->
+  <line x1="673" y1="120" x2="698" y2="120" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#cb)"/>
+  <text x="685" y="113" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#58a6ff">USB</text>
+
+  <!-- WIP label -->
+  <text x="752" y="270" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">--- = WIP</text>
+
+  <!-- legend -->
+  <line x1="20" y1="355" x2="45" y2="355" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="52" y="359" font-family="JetBrains Mono, monospace" font-size="9" fill="#6e7681">audio / I2S / LC3</text>
+  <line x1="185" y1="355" x2="210" y2="355" stroke="#b794f4" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="217" y="359" font-family="JetBrains Mono, monospace" font-size="9" fill="#6e7681">BLE / Auracast</text>
+  <line x1="330" y1="355" x2="355" y2="355" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="362" y="359" font-family="JetBrains Mono, monospace" font-size="9" fill="#6e7681">USB</text>
+  <rect x="410" y="349" width="10" height="10" rx="2" fill="#0d1117" stroke="#6e7681" stroke-width="1" stroke-dasharray="2,2"/>
+  <text x="427" y="359" font-family="JetBrains Mono, monospace" font-size="9" fill="#6e7681">planned (WIP)</text>
+</svg>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:6px 0 24px;">Component overview — dashed boxes are planned (WIP).</p>
+  </div>
+
+  <h3 style="font-size:1rem;margin:8px 0 8px;color:var(--text);">Signal flow</h3>
+  <div style="margin:0 0 6px;">
+    <svg viewBox="0 0 820 470" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;background:#0d1117;border-radius:8px;border:1px solid #21262d;">
+  <defs>
+    <marker id="arr-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#4ade80"/></marker>
+    <marker id="arr-b" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#58a6ff"/></marker>
+    <marker id="arr-p" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#b794f4"/></marker>
+  </defs>
+  <text x="410" y="24" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#6e7681" letter-spacing="1">SEQUENCE DIAGRAM · SIGNAL FLOW</text>
+  <rect x="16" y="38" width="88" height="28" rx="4" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+<text x="60" y="57" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#e6edf3">I2S Mic</text>
+<line x1="60" y1="66" x2="60" y2="440" stroke="#21262d" stroke-width="1" stroke-dasharray="4,4"/>
+<rect x="141" y="38" width="88" height="28" rx="4" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+<text x="185" y="57" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#4ade80">nRF5340 GW</text>
+<line x1="185" y1="66" x2="185" y2="440" stroke="#21262d" stroke-width="1" stroke-dasharray="4,4"/>
+<rect x="296" y="38" width="88" height="28" rx="4" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+<text x="340" y="57" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#b794f4">Auracast</text>
+<line x1="340" y1="66" x2="340" y2="440" stroke="#21262d" stroke-width="1" stroke-dasharray="4,4"/>
+<rect x="446" y="38" width="88" height="28" rx="4" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+<text x="490" y="57" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#4ade80">nRF5340 HS</text>
+<line x1="490" y1="66" x2="490" y2="440" stroke="#21262d" stroke-width="1" stroke-dasharray="4,4"/>
+<rect x="576" y="38" width="88" height="28" rx="4" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+<text x="620" y="57" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#58a6ff">USB</text>
+<line x1="620" y1="66" x2="620" y2="440" stroke="#21262d" stroke-width="1" stroke-dasharray="4,4"/>
+<rect x="711" y="38" width="88" height="28" rx="4" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+<text x="755" y="57" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="#e6edf3">Linux</text>
+<line x1="755" y1="66" x2="755" y2="440" stroke="#21262d" stroke-width="1" stroke-dasharray="4,4"/>
+
+
+  <!-- step labels col -->
+  <!-- 1. I2S mic → GW -->
+  <line x1="60" y1="105" x2="175" y2="105" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arr-g)"/>
+  <text x="118" y="98"  text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="#4ade80">I2S PCM 48kHz</text>
+  <text x="22"  y="109" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">1.</text>
+
+  <!-- 2. GW encodes -->
+  <rect x="165" y="118" width="40" height="20" rx="3" fill="#0f2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="185" y="131" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#4ade80">LC3 enc</text>
+  <text x="22"  y="135" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">2.</text>
+
+  <!-- 3. GW → Auracast BIS -->
+  <line x1="185" y1="158" x2="330" y2="158" stroke="#b794f4" stroke-width="1.5" marker-end="url(#arr-p)"/>
+  <text x="256" y="150" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="#b794f4">BIS · 2× ISO channels</text>
+  <text x="22"  y="162" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">3.</text>
+  <text x="256" y="170" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">0x1 (L) + 0x2 (R) · 96kbps</text>
+
+  <!-- 4. Auracast → HS sync -->
+  <line x1="340" y1="205" x2="480" y2="205" stroke="#b794f4" stroke-width="1.5" marker-end="url(#arr-p)"/>
+  <text x="408" y="197" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="#b794f4">passive sync 0x0003</text>
+  <text x="22"  y="209" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">4.</text>
+  <text x="408" y="217" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">no pairing · no ACKs</text>
+
+  <!-- 5. HS decodes -->
+  <rect x="470" y="228" width="40" height="20" rx="3" fill="#0f2a1a" stroke="#4ade80" stroke-width="1"/>
+  <text x="490" y="241" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#4ade80">LC3 dec</text>
+  <text x="22"  y="245" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">5.</text>
+
+  <!-- 6. HS → USB UAC2 -->
+  <line x1="490" y1="268" x2="610" y2="268" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr-b)"/>
+  <text x="549" y="260" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="#58a6ff">USB Audio Class 2</text>
+  <text x="22"  y="272" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">6.</text>
+
+  <!-- 7. USB → Linux snd-usb-audio -->
+  <line x1="620" y1="308" x2="745" y2="308" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr-b)"/>
+  <text x="682" y="300" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="#58a6ff">snd-usb-audio</text>
+  <text x="22"  y="312" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">7.</text>
+  <text x="682" y="320" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">card 1: nRF5340 USB Audio</text>
+
+  <!-- 8. ALSA capture -->
+  <rect x="710" y="334" width="90" height="20" rx="3" fill="#0d1f33" stroke="#58a6ff" stroke-width="1"/>
+  <text x="755" y="347" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#58a6ff">ALSA / arecord</text>
+  <text x="22"  y="351" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" fill="#6e7681">8.</text>
+
+  <!-- legend -->
+  <line x1="30" y1="420" x2="58" y2="420" stroke="#4ade80" stroke-width="1.5"/>
+  <text x="64" y="424" font-family="JetBrains Mono, monospace" font-size="9" fill="#6e7681">audio / LC3</text>
+  <line x1="160" y1="420" x2="188" y2="420" stroke="#b794f4" stroke-width="1.5"/>
+  <text x="194" y="424" font-family="JetBrains Mono, monospace" font-size="9" fill="#6e7681">BLE / Auracast</text>
+  <line x1="310" y1="420" x2="338" y2="420" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="344" y="424" font-family="JetBrains Mono, monospace" font-size="9" fill="#6e7681">USB</text>
+</svg>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--muted);margin:6px 0 0;">Step-by-step signal path from I2S microphone to ALSA on the Linux host.</p>
+  </div>
 
     <p>The gateway starts broadcasting two LC3 streams at 48kHz, 96kbps — one per stereo channel:</p>
     <figure style="margin:14px 0 6px;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;">
