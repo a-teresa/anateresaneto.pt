@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AuraScope · Step 02 — Custom image & recipe</title>
-<meta name="description" content="Step 02 of AuraScope: Add a layer and a recipe that deploys my own binary into the image." />
+<title>AuraScope · Step 02 — Custom image &amp; recipe</title>
+<meta name="description" content="Step 02 of AuraScope: a real image recipe, a gen-machineconf ordering bug that reappears on every regen, a device tree built from the real linux-xlnx dtsi, and three attempts at an FSBL before one actually worked." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -22,6 +22,8 @@
   .case p { color: #b7bcc4; margin-bottom: 14px; }
   .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
   .case li { margin-bottom: 6px; }
+  .case code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; color: var(--accent); }
   .tagline {
     display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
     background: var(--accent-dim); color: var(--accent);
@@ -32,9 +34,20 @@
     background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 16px; overflow-x: auto; margin: 8px 0 16px;
   }
+  pre.code .c { color: #6f7785; }
+  pre.code .out { color: #7fb88a; }
+  pre.code .err { color: #d98a8a; }
   .note {
     border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
     border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
+  }
+  .deadend {
+    border-left: 3px solid #b05050; background: #1a1212; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #e0bcbc; font-size: .92rem; margin: 16px 0;
+  }
+  .find {
+    border-left: 3px solid var(--accent); background: #0f1a14; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #cfe8d6; font-size: .92rem; margin: 16px 0;
   }
   .stepnav {
     display: flex; justify-content: space-between; gap: 12px; margin-top: 50px;
@@ -56,29 +69,233 @@
 <main class="case">
   <p class="crumb"><a href="../../index.html#work">work</a> / <a href="../aurascope.html">aurascope</a> / step 02</p>
 
-  <span class="tagline">STEP 02 · TAG v0.2-custom-recipe</span>
-  <h1>Custom image & recipe</h1>
-  <p class="meta">// phase 1 · foundation · status: planned · published [date]</p>
+  <span class="tagline">STEP 02 · TAG v0.2-custom-recipe · DONE</span>
+  <h1>Custom image &amp; recipe</h1>
+  <p class="meta">// phase 1 · foundation · Yocto 5.0 "Scarthgap" · meta-xilinx rel-v2025.2 · MACHINE=aurascope-arty-z7</p>
 
-  <h2>The goal of this step</h2>
-  <p>Add a layer and a recipe that deploys my own binary into the image.</p>
+  <h2>The goal</h2>
+  <p>
+    Step 01 got a machine generated from the real <code>.xsa</code>, but nothing had actually
+    built yet. <code>meta-aurascope</code> was still just a layer skeleton — <code>conf/layer.conf</code>
+    and nothing else — and <code>local.conf</code> still defaulted <code>MACHINE</code> to
+    <code>qemux86-64</code>. The goal here was <code>bitbake aurascope-image</code> succeeding for
+    the real board, not the QEMU stand-in.
+  </p>
 
-  <h2>What I did</h2>
+  <h2>The image recipe</h2>
+  <p>
+    <code>meta-aurascope/recipes-core/images/aurascope-image.bb</code>, modeled directly on poky's
+    <code>core-image-minimal.bb</code>:
+  </p>
+  <pre class="code">SUMMARY = "AuraScope base image for the Arty Z7-20 (Zynq-7000)"
+LICENSE = "MIT"
+inherit core-image
+IMAGE_INSTALL = "packagegroup-core-boot ${CORE_IMAGE_EXTRA_INSTALL}"
+IMAGE_ROOTFS_SIZE ?= "8192"
+IMAGE_ROOTFS_EXTRA_SPACE:append = "..."</pre>
+  <p>
+    Setting <code>MACHINE = "aurascope-arty-z7"</code> in <code>build/conf/local.conf</code> was
+    enough on its own to get this building for QEMU. Pointing it at the real board is where it
+    got interesting.
+  </p>
+
+  <h2>Bug: XILINX_WITH_ESW ordering in the generated machine conf</h2>
+  <p>
+    First real-board parse failed with <code>virtual/dtb</code>, <code>fsbl</code>, and
+    <code>virtual/bitstream</code> all reporting "Nothing PROVIDES". The cause was inside the
+    generated <code>build/conf/machine/aurascope-arty-z7.conf</code> itself:
+  </p>
+  <pre class="code"><span class="c"># Required generic machine inclusion</span>
+require conf/machine/zynq-generic.conf     <span class="err">&lt;- was BEFORE this</span>
+
+<span class="c"># This is an 'XSCT' based BSP</span>
+XILINX_WITH_ESW = "xsct"                   <span class="err">&lt;- ...this</span></pre>
+  <p>
+    <code>zynq-generic.conf</code>'s own comment says hardware-specific variables must be set
+    <em>before</em> its <code>require</code>, because several <code>PREFERRED_PROVIDER</code>
+    defaults in <code>meta-xilinx-core/conf/machine/include/machine-xilinx-default.inc</code> key
+    off <code>XILINX_WITH_ESW</code> at parse time:
+  </p>
+  <pre class="code">PREFERRED_PROVIDER_virtual/dtb ??= "${@'device-tree' if d.getVar('XILINX_WITH_ESW') else ''}"</pre>
+  <div class="deadend">
+    <strong>Not a one-off typo:</strong> I confirmed this is an actual upstream bug by reading
+    <code>gen-machineconf</code>'s own source
+    (<code>meta-xilinx-core/gen-machine-conf/lib/yocto_machine.py</code>,
+    <code>YoctoXsctConfigs()</code>). Its own comment states the same ordering requirement — then
+    the function emits the <code>require</code> line before <code>XILINX_WITH_ESW = "xsct"</code>
+    anyway. It reappears every time <code>gen-machineconf</code> regenerates the file; I had to
+    reapply the fix after re-running it.
+  </div>
+  <p>Fix: move the <code>XILINX_WITH_ESW</code> line above the <code>require</code> line.</p>
+  <p>
+    I re-ran <code>gen-machineconf</code> once <code>meta-aurascope</code> actually had a
+    <code>recipes-*</code> directory to work with — the earlier run had warned
+    <code>"No bb files in default matched BBFILE_PATTERN_meta-aurascope"</code>, which is why it
+    never dropped anything useful into the layer the first time:
+  </p>
+  <pre class="code">./meta-xilinx/meta-xilinx-core/gen-machine-conf/gen-machineconf \
+  --soc-family zynq \
+  --hw-description aurascope/hw/design_2_wrapper.xsa \
+  --machine-name aurascope-arty-z7 \
+  --xsct-tool /opt/2025.2/Vitis</pre>
+
+  <h2>Device tree</h2>
+  <p>
+    <code>device-tree.bb</code> (in <code>meta-xilinx-core</code>) self-skips unless
+    <code>CONFIG_DTFILE</code> or <code>SYSTEM_DTFILE</code> is set:
+  </p>
+  <pre class="code">def check_devicetree_variables(d):
+    if not d.getVar('CONFIG_DTFILE'):
+        raise bb.parse.SkipRecipe(...)</pre>
+  <p>
+    Nothing in the "xsct" flow (used for Zynq-7000 — System Device Tree / lopper-based generation
+    is ZynqMP+/Versal only) ever sets this. The <code>YAML_CONSOLE_DEVICE_CONFIG</code> /
+    <code>YAML_MAIN_MEMORY_CONFIG</code> variables that <code>gen-machineconf</code> writes into
+    the machine conf for "xsct" mode are, as far as I can tell, dead in this meta-xilinx release —
+    I grepped the whole tree and nothing outside <code>gen-machineconf</code> itself reads them.
+  </p>
+  <p>
+    Rather than hand-write a full Zynq-7000 SoC-level device tree from scratch (real risk of
+    subtly wrong clock/interrupt indices, hard to debug without hardware in hand), I added:
+  </p>
   <ul>
-    <li>[ first concrete thing ]</li>
-    <li>[ second concrete thing ]</li>
-    <li>[ third concrete thing ]</li>
+    <li><code>meta-aurascope/recipes-bsp/device-tree/device-tree.bbappend</code></li>
+    <li><code>meta-aurascope/recipes-bsp/device-tree/files/system-top.dts</code></li>
   </ul>
+  <p>
+    The bbappend re-enables <code>devicetree.bbclass</code>'s normal <code>KERNEL_INCLUDE</code>
+    default (<code>device-tree.bb</code> blanks it out by default — "Since we're not based on a
+    kernel default to nothing"), so <code>system-top.dts</code> can <code>#include
+    "zynq-7000.dtsi"</code> and pull in the real, maintained dtsi shipped by <code>linux-xlnx</code>
+    instead of a hand-copied one. This also auto-adds a <code>do_compile</code> dependency on
+    <code>virtual/kernel:do_configure</code>, so the kernel source is staged first.
+  </p>
+  <p>
+    <code>system-top.dts</code> itself is intentionally minimal for now: a memory node sized for
+    the Arty Z7-20's 1 GiB DDR3L, <code>chosen/stdout-path</code> set to <code>ttyPS0</code>,
+    uart0 forced on. No PL/AXI-GPIO nodes yet — see the bitstream section below.
+  </p>
+  <div class="note">
+    <strong>Unverified assumption:</strong> I assumed the dtsi filename <code>zynq-7000.dtsi</code>
+    matches what <code>linux-xlnx</code> ships — it's the mainline/mostly-universal name across
+    Xilinx forks, but I haven't confirmed it against this specific branch yet. Worth
+    double-checking on the actual build — if it's named differently, it'll be an immediate,
+    obvious <code>#include</code>-not-found error, one-line fix.
+  </div>
 
-  <h2>The tricky part</h2>
-  <p>[ The one thing that actually cost time. Be specific and honest — this is the section readers remember. ]</p>
+  <h2>Bitstream — deferred, not solved</h2>
+  <p>
+    <code>xilinx-bootbin</code> (builds <code>BOOT.bin</code>) pulls in
+    <code>virtual/bitstream</code> by default via <code>BIF_BITSTREAM_ATTR</code>, which defaults
+    to <code>"bitstream"</code> unless <code>MACHINE_FEATURES</code> contains
+    <code>"fpga-overlay"</code>. Rather than sourcing an actual <code>.bit</code> file (would need
+    Vivado to build/export one separately from the <code>.xsa</code>, or the <code>.xsa</code> to
+    embed it), I set:
+  </p>
+  <pre class="code">BIF_BITSTREAM_ATTR = ""</pre>
+  <p>in <code>build/conf/local.conf</code>. Meaning:</p>
+  <div class="note">
+    <strong>Honest note:</strong> <code>BOOT.bin</code> ships FSBL + u-boot + device tree but does
+    <em>not</em> configure the PL. Linux still boots fine — PS and PL are independent on
+    Zynq-7000 — but AXI GPIO and anything else in the fabric won't be accessible until the
+    bitstream is loaded, either at boot (revisit this) or later via fpga-manager. Fine for "first
+    boot," but this <em>will</em> need revisiting for the audio-status LED step, since that's
+    AXI GPIO in the PL.
+  </div>
 
-  <pre class="code"># [ the handful of commands / code that matter — keep it copy-pasteable ]</pre>
+  <h2>FSBL — the hard part</h2>
+  <p>
+    <code>fsbl.bb</code> (in <code>meta-xilinx-core</code>) also self-skips unless it's handed a
+    precompiled <code>fsbl.elf</code> via <code>FSBL_FILE</code>, or <code>FSBL_DEPENDS</code> /
+    <code>FSBL_MCDEPENDS</code> point at something that builds one. Three things tried, in order.
+  </p>
 
-  <div class="note"><strong>Honest note:</strong> [ anything simulated, stubbed, or deferred at this stage — state it plainly. ]</div>
+  <p><strong>a) meta-xilinx-standalone's "fsbl-fw" multiconfig.</strong> A ready-made template —
+    <code>conf/multiconfig/fsbl-fw.conf</code> + <code>recipes-bsp/embeddedsw/fsbl-fw-cfg.inc</code>
+    already exist: <code>BBMULTICONFIG += "fsbl-fw"</code>, a separate <code>TMPDIR</code>,
+    <code>DISTRO=xilinx-standalone</code> with a real <code>arm-xilinx-eabi</code> toolchain.
+    Wired it up — the multiconfig parsed fine, <code>mc:fsbl-fw</code> context showed
+    <code>TARGET_SYS=arm-xilinx-eabi</code>, <code>DISTRO=xilinx-standalone</code>, correct — but
+    the task graph failed:
+  </p>
+  <pre class="code"><span class="err">ERROR: Task mcdepends on non-existent task
+mc:fsbl-fw:.../fsbl-firmware_2025.2.bb:do_deploy</span></pre>
+  <div class="deadend">
+    <strong>Dead end.</strong> Read <code>fsbl-firmware.inc</code> and
+    <code>xlnx-embeddedsw.bbclass</code> in full to confirm: in "xsct" ESW mode, this recipe only
+    fetches the Xilinx embeddedsw git source. No <code>do_compile</code>, no <code>do_install</code>,
+    no <code>do_deploy</code> at all — it genuinely does nothing beyond the source fetch. Verified
+    with <code>bitbake -c deploy mc:fsbl-fw:fsbl-firmware</code> →
+    <code>"Task do_deploy does not exist for target fsbl-firmware"</code>.
+  </div>
+
+  <p><strong>b) Switched XILINX_WITH_ESW from "xsct" to "generic".</strong> This mode's
+    <code>fsbl-firmware_generic.inc</code> does have real <code>do_install</code>/<code>do_deploy</code>
+    tasks — compiles <code>zynq_fsbl</code> from embeddedsw source via a Makefile and the
+    multiconfig's cross-compiler. Looked promising, until:
+  </p>
+  <pre class="code">SKIP_MSG:zynq = "Generic support for zynq is not available"</pre>
+  <div class="deadend">
+    <strong>Dead end.</strong> Every version of <code>fsbl-firmware_*+git-generic.inc</code> has
+    this — deliberately, permanently disabled for Zynq-7000 upstream. "generic" mode looks to be
+    supported only for zynqmp/versal in this meta-xilinx release. Reverted
+    <code>XILINX_WITH_ESW</code> back to <code>"xsct"</code>.
+  </div>
+
+  <p><strong>c) Built fsbl.elf directly with Vitis, outside bitbake.</strong> Vitis 2025.2 is the
+    "unified" IDE; found a working example at
+    <code>/opt/2025.2/Vitis/cli/examples/embedded/platform_uc4_zynq.py</code> and adapted it —
+    headless, via <code>vitis -s script.py</code>:
+  </p>
+  <pre class="code">client = vitis.create_client()
+client.set_workspace(workspace)
+platform = client.create_platform_component(
+    name='aurascope_platform',
+    hw_design='/path/to/aurascope/hw/design_2_wrapper.xsa')
+platform.add_domain(name='standalone_a9_0',
+                     cpu='ps7_cortexa9_0', os='standalone')
+platform.build()</pre>
+  <div class="find">
+    <strong>Worked.</strong> Compiled a real <code>fsbl.elf</code> (91345 text / 10904 data /
+    76300 bss), using <code>ps7_init.c</code> generated fresh from the <code>.xsa</code>'s
+    hardware description — a good sanity check that the <code>.xsa</code> itself is valid and
+    complete. Output landed at
+    <code>&lt;workspace&gt;/aurascope_platform/export/aurascope_platform/sw/boot/fsbl.elf</code>.
+  </div>
+  <p>Copied it into the repo and wired it into the recipe:</p>
+  <pre class="code">meta-aurascope/recipes-bsp/embeddedsw/files/fsbl.elf
+meta-aurascope/recipes-bsp/embeddedsw/fsbl.bbappend
+  FSBL_FILE := "${THISDIR}/files/fsbl"</pre>
+  <div class="note">
+    <strong>The <code>:=</code> vs <code>=</code> bug:</strong> first attempt used <code>=</code>
+    instead of <code>:=</code> for that assignment — silently wrong. <code>THISDIR</code> only
+    resolves to the bbappend's own directory if captured immediately (<code>:=</code>) at parse
+    time; with a plain <code>=</code> it's re-evaluated later, when the anonymous
+    <code>python()</code> check actually reads <code>FSBL_FILE</code> — by which point
+    <code>THISDIR</code> had reverted to <code>fsbl.bb</code>'s own directory
+    (<code>meta-xilinx-core/recipes-bsp/embeddedsw</code>), not the bbappend's. This is exactly
+    why the standard <code>FILESEXTRAPATHS:prepend := "${THISDIR}/files:"</code> idiom always
+    uses <code>:=</code> — good one to remember.
+  </div>
+  <p>
+    One more red herring along the way: <code>meta-xilinx-standalone</code> ships its own
+    competing <code>fsbl.bbappend</code>, at higher layer priority than
+    <code>meta-aurascope</code> (7 vs 6), which redefines <code>check_fsbl_variables()</code> with
+    a slightly different error message but the same underlying logic. Not a conflict — just made
+    the error text look like it was coming from somewhere other than expected.
+  </p>
 
   <h2>Result</h2>
-  <p>[ The concrete, verifiable win for this step, and what it unlocks for the next one. ]</p>
+  <p>
+    <code>bitbake -n aurascope-image</code> (dry run) for
+    <code>MACHINE=aurascope-arty-z7</code>: 4637 tasks, 0 missing providers, everything projected
+    to succeed — toolchain, kernel, u-boot, FSBL, device tree, rootfs, BOOT.bin, WIC image.
+  </p>
+  <p>
+    Have not yet run the real (non-dry-run) build, and have not yet flashed or booted actual
+    hardware. That's the natural next checkpoint: run <code>bitbake aurascope-image</code> for
+    real, then flash, open a serial console, and confirm a login prompt.
+  </p>
 
   <h2>Code</h2>
   <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa">v0.2-custom-recipe</a>.</p>
