@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>AuraScope · Step 02 — Custom image &amp; recipe</title>
-<meta name="description" content="Step 02 of AuraScope: a real image recipe, a gen-machineconf ordering bug that reappears on every regen, a device tree built from the real linux-xlnx dtsi, and three attempts at an FSBL before one actually worked." />
+<meta name="description" content="Step 02 of AuraScope: a real image recipe, a gen-machineconf ordering bug, three attempts at an FSBL, and the real boot bring-up — a silent board traced to two missing device-tree properties, and an FSBL that couldn't say why." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -56,6 +56,15 @@
   .stepnav a { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
   .stepnav a:hover { color: var(--accent); }
   .stepnav .disabled { opacity: .35; pointer-events: none; }
+  .table-wrap { overflow-x: auto; margin: 8px 0 16px; }
+  .case table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .case th, .case td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .case th {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .5px; color: var(--muted);
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .case td { color: #b7bcc4; }
+  .case td code, .case th code { white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -176,11 +185,11 @@ XILINX_WITH_ESW = "xsct"                   <span class="err">&lt;- ...this</span
     uart0 forced on. No PL/AXI-GPIO nodes yet — see the bitstream section below.
   </p>
   <div class="note">
-    <strong>Unverified assumption:</strong> I assumed the dtsi filename <code>zynq-7000.dtsi</code>
-    matches what <code>linux-xlnx</code> ships — it's the mainline/mostly-universal name across
-    Xilinx forks, but I haven't confirmed it against this specific branch yet. Worth
-    double-checking on the actual build — if it's named differently, it'll be an immediate,
-    obvious <code>#include</code>-not-found error, one-line fix.
+    <strong>Unverified assumption at the time:</strong> I assumed the dtsi filename
+    <code>zynq-7000.dtsi</code> matches what <code>linux-xlnx</code> ships — it's the
+    mainline/mostly-universal name across Xilinx forks, but I hadn't confirmed it against this
+    specific branch yet. <strong>Update: it resolved cleanly</strong> — see the boot bring-up
+    below for what the real build actually needed on top of this minimal file.
   </div>
 
   <h2>Bitstream — deferred, not solved</h2>
@@ -285,20 +294,340 @@ meta-aurascope/recipes-bsp/embeddedsw/fsbl.bbappend
     the error text look like it was coming from somewhere other than expected.
   </p>
 
-  <h2>Result</h2>
+  <h2>The real build, and a silent board</h2>
   <p>
-    <code>bitbake -n aurascope-image</code> (dry run) for
-    <code>MACHINE=aurascope-arty-z7</code>: 4637 tasks, 0 missing providers, everything projected
-    to succeed — toolchain, kernel, u-boot, FSBL, device tree, rootfs, BOOT.bin, WIC image.
+    <code>bitbake -n aurascope-image</code> (dry run) had confirmed the plan: 4637 tasks, 0 missing
+    providers. Running it for real — then flashing to SD and powering up the actual board — was a
+    different story. The board was completely silent on serial for several days.
   </p>
   <p>
-    Have not yet run the real (non-dry-run) build, and have not yet flashed or booted actual
-    hardware. That's the natural next checkpoint: run <code>bitbake aurascope-image</code> for
-    real, then flash, open a serial console, and confirm a login prompt.
+    Everything I could think to suspect turned out correct: SD cards, QSPI, BootROM, PS7 clocks,
+    DDR, MIO routing, the FSBL binary's integrity. The real cause was two missing properties in
+    <code>system-top.dts</code> — the file from the section above.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Root cause</th><th>Mechanism</th><th>Symptom</th></tr>
+      <tr>
+        <td>Missing <code>serial0</code> alias</td>
+        <td><code>chosen/stdout-path</code> referenced <code>serial0</code>, but the aliases
+          <code>zynq-7000.dtsi</code> provides are only <code>uart0</code>/<code>uart1</code>
+          (Xilinx naming). U-Boot couldn't resolve the console node.</td>
+        <td>No serial driver found → <code>CONFIG_REQUIRE_SERIAL_CONSOLE=y</code> forced a reset
+          → continuous boot loop.</td>
+      </tr>
+      <tr>
+        <td>Missing <code>ps-clk-frequency</code></td>
+        <td><code>zynq-7000.dtsi</code> defaults to 33.333 MHz. The Arty Z7's PS clock is
+          50 MHz, so every derived clock was off by a factor of 1.5.</td>
+        <td>UART transmitted at ~172800 baud while the terminal listened at 115200 — consistent,
+          non-random character corruption.</td>
+      </tr>
+    </table>
+  </div>
+  <p>
+    A third issue wasn't a bug but the single biggest obstacle to diagnosing the first two: the
+    committed FSBL had debug printing compiled out entirely, so "no output" carried no information
+    about how far boot had actually gotten. More on that below.
+  </p>
+
+  <h2>Fix 1 — the serial0 alias</h2>
+  <p>
+    <code>zynq-7000.dtsi</code>'s <code>aliases</code> node defines <code>uart0</code> and
+    <code>uart1</code> — the Xilinx convention. Both U-Boot and Linux resolve
+    <code>stdout-path</code> and <code>console=ttyPS0</code> through the standard names
+    <code>serial0</code>/<code>serial1</code>. Those aliases didn't exist, so no console device was
+    ever bound. Confirmed by decompiling the generated <code>u-boot.dtb</code>: its aliases block
+    listed <code>uart0, uart1, spi0, qspi, gem0, sdhci0, clkc …</code> — no <code>serial0</code> —
+    while <code>chosen</code> still referenced <code>stdout-path = "serial0:115200n8"</code>.
+  </p>
+  <pre class="code">/ {
+	aliases {
+		serial0 = &amp;uart0;
+		serial1 = &amp;uart1;
+	};
+};</pre>
+  <div class="note">
+    <strong>Placement matters:</strong> the <code>aliases</code> node has to sit inside the root
+    <code>/ { … }</code> braces. Aliases merge rather than replace, so <code>uart0</code>/<code>uart1</code>
+    and everything else inherited from the <code>.dtsi</code> survive. Putting it at the top level,
+    between the <code>#include</code> and <code>/ {</code>, produced
+    <code>system-top.dts:3.1-8 syntax error — Unable to parse input tree</code>.
+  </div>
+  <p>Verification:</p>
+  <pre class="code">dtc -I dtb -O dts \
+  tmp/deploy/images/aurascope-arty-z7/u-boot.dtb 2>/dev/null \
+  | grep -A25 aliases | grep serial
+<span class="c"># expect: serial0 = "/axi/serial@e0000000";</span></pre>
+
+  <h2>Fix 2 — the PS clock frequency</h2>
+  <p>
+    The <code>clkc@100</code> node carried no <code>ps-clk-frequency</code> property, so the Zynq
+    clock driver fell back to its built-in default of 33,333,333 Hz — correct for most Xilinx
+    reference boards, but not the Arty Z7's 50 MHz PS clock. Every derived clock, including
+    <code>uart_ref_clk</code>, was 1.5× off, and the UART baud divisors were computed from the
+    wrong base.
+  </p>
+  <pre class="code">&amp;clkc {
+	ps-clk-frequency = &lt;50000000&gt;;
+};</pre>
+  <p>Corroborated by reading the divisors live off the hardware, rather than just trusting the fix:</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Step</th><th>Value</th></tr>
+      <tr><td>Observed on hardware</td><td><code>UART0 CD = 124, BDIV = 6</code> (via <code>mrd 0xE0000018</code> / <code>0xE0000034</code>)</td></tr>
+      <tr><td>Implied reference clock</td><td>115200 × 124 × 7 = 99,993,600 Hz ≈ 100 MHz</td></tr>
+      <tr><td>SLCR divisor</td><td><code>0xF8000154</code> bits [13:8] = 0x0A = 10</td></tr>
+      <tr><td>Implied IO PLL</td><td>100 MHz × 10 = 1000 MHz</td></tr>
+      <tr><td>Implied PS clock</td><td>1000 MHz ÷ 20 = <strong>50 MHz</strong> — matches the fix</td></tr>
+      <tr><td>Kernel confirmation</td><td><code>ttyPS0 … base_baud = 6250000</code> = 100 MHz ÷ 16</td></tr>
+    </table>
+  </div>
+
+  <h2>Fix 3 — enabling SDHCI0</h2>
+  <p>
+    With the console working, U-Boot reached its prompt but reported <code>MMC: (empty)</code> and
+    <code>No MMC device available</code> — it couldn't read the very card it had just been loaded
+    from. <code>zynq-7000.dtsi</code> defaults <code>sdhci0</code> to <code>status = "disabled"</code>.
+  </p>
+  <pre class="code">&amp;sdhci0 {
+	status = "okay";
+};</pre>
+  <p>
+    After this, U-Boot found <code>/boot.scr</code> on <code>mmc 0:1</code> and the full boot chain
+    completed. Ethernet (<code>gem0</code>) came up in the same rebuild.
+  </p>
+
+  <h2>The final system-top.dts</h2>
+  <p>All three fixes landed with comments explaining why, since neither is self-evident from the symptom:</p>
+  <pre class="code">/dts-v1/;
+#include "zynq-7000.dtsi"
+
+/ {
+	model = "AuraScope Arty Z7-20";
+	compatible = "digilent,zynq-artyz7", "xlnx,zynq-7000";
+
+	<span class="c">/* REQUIRED: zynq-7000.dtsi provides only the Xilinx-style
+	 * uart0/uart1 aliases. U-Boot and Linux resolve the console
+	 * through the standard serial0/serial1 names. Without these,
+	 * stdout-path cannot resolve, no console binds, and
+	 * CONFIG_REQUIRE_SERIAL_CONSOLE=y resets the board in a loop. */</span>
+	aliases {
+		serial0 = &amp;uart0;
+		serial1 = &amp;uart1;
+	};
+
+	<span class="c">/* Arty Z7-20: 1 GiB DDR3L. */</span>
+	memory@0 {
+		device_type = "memory";
+		reg = &lt;0x0 0x40000000&gt;;
+	};
+
+	chosen {
+		bootargs = "console=ttyPS0,115200 root=/dev/mmcblk0p2 rw rootwait";
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+&amp;uart0 {
+	status = "okay";
+};
+
+<span class="c">/* REQUIRED: zynq-7000.dtsi defaults ps-clk-frequency to 33.333 MHz.
+ * The Arty Z7 PS clock is 50 MHz. Without this override every derived
+ * clock is 1.5x low and the UART transmits at ~172800 baud. */</span>
+&amp;clkc {
+	ps-clk-frequency = &lt;50000000&gt;;
+};
+
+&amp;sdhci0 {
+	status = "okay";
+};</pre>
+
+  <h2>The real obstacle: an FSBL that couldn't tell me anything</h2>
+  <p>
+    Not a boot bug, but the single largest reason this took days instead of hours: the committed
+    <code>fsbl.elf</code> (from the Vitis build in the section above) had debug printing compiled
+    out.
+  </p>
+  <pre class="code">$ strings fsbl.elf | grep -i fsbl_dbg
+fsbl_printf(type,...) if (((type) &amp; fsbl_dbg_current_types)) { xil_printf(...); }
+fsbl_dbg_current_types 0</pre>
+  <div class="deadend">
+    <strong>Silence said nothing.</strong> Every <code>fsbl_printf</code> call was optimized away
+    and the format strings don't appear in the binary at all. A perfectly healthy FSBL and a
+    completely broken one look identical on the wire until this is fixed — which meant the first
+    few days of debugging were aimed at the wrong layer entirely.
+  </div>
+  <p>Rebuilt with <code>FSBL_DEBUG_INFO</code> defined (Vitis: project → C/C++ Build Settings → ARM v7 gcc compiler → Symbols; equivalent headless flow):</p>
+  <pre class="code">xsct
+platform create -name arty_fsbl -hw hw/design_2_wrapper.xsa \
+  -os standalone -proc ps7_cortexa9_0
+app create -name fsbl -template {Zynq FSBL} -platform arty_fsbl \
+  -domain standalone_ps7_cortexa9_0
+app config -name fsbl -add define-compiler-symbols FSBL_DEBUG_INFO
+app build -name fsbl
+<span class="c"># verify before installing:</span>
+strings fsbl.elf | grep -i "first stage"   <span class="c"># must return the banner string</span></pre>
+  <div class="find">
+    <strong>What it revealed:</strong> <code>Xilinx First Stage Boot Loader</code> ·
+    <code>Boot mode is SD</code> · <code>SD: rc= 0</code> · <code>SD Init Done</code> ·
+    <code>Handoff Address: 0x04000000</code> · <code>SUCCESSFUL_HANDOFF</code> ·
+    <code>FSBL Status = 0xE0000000</code>. FSBL had been working correctly the entire time — this
+    immediately eliminated FSBL, SD hardware, BootROM, and the boot image layout, and moved the
+    investigation to U-Boot, which is where the <code>serial0</code> alias fix actually lived.
+  </div>
+  <div class="note">
+    <strong>Recommendation:</strong> keep <code>FSBL_DEBUG_INFO</code> enabled for development
+    builds. A boot loader that can't report its own progress turns a one-line configuration bug
+    into a multi-day investigation.
+  </div>
+
+  <h2>U-Boot notes</h2>
+  <p>
+    A temporary debug-UART config fragment bypassed U-Boot's driver model and device-tree probing
+    entirely, to get an early console. It's what produced the decisive
+    <code>No serial driver found</code> message that pointed at the alias problem in the first
+    place. Removed once the real fix landed, but worth keeping in the layer, commented out, for
+    future early-boot debugging:
+  </p>
+  <pre class="code"><span class="c"># meta-aurascope/recipes-bsp/u-boot/files/debug-uart.cfg  (removed)</span>
+CONFIG_DEBUG_UART=y
+CONFIG_DEBUG_UART_ZYNQ=y
+CONFIG_DEBUG_UART_BASE=0xe0000000
+CONFIG_DEBUG_UART_CLOCK=100000000
+CONFIG_DEBUG_UART_ANNOUNCE=y</pre>
+  <p>Everything else in the U-Boot config was already correct and didn't need touching:</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Config</th><th>Value / note</th></tr>
+      <tr><td><code>UBOOT_MACHINE</code></td><td><code>xilinx_zynq_virt_defconfig</code></td></tr>
+      <tr><td><code>CONFIG_TEXT_BASE</code></td><td><code>0x4000000</code> — matches the FSBL handoff address</td></tr>
+      <tr><td><code>CONFIG_XILINX_OF_BOARD_DTB_ADDR</code></td><td><code>0x100000</code> — matches the FSBL partition 2 load address</td></tr>
+      <tr><td><code>CONFIG_REQUIRE_SERIAL_CONSOLE</code></td><td><code>y</code> — this is what turned the console-bind failure into a hard reset</td></tr>
+      <tr><td><code>CONFIG_DEFAULT_DEVICE_TREE</code></td><td><code>"zynq-zc706"</code> — unused, overridden by the external DTB at <code>0x100000</code>. A red herring during diagnosis, not a bug.</td></tr>
+    </table>
+  </div>
+
+  <h2>Diagnostic pitfalls worth not repeating</h2>
+  <p>Several observations were actively misleading during the investigation:</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Observation</th><th>Assumed</th><th>Actually</th></tr>
+      <tr><td>Serial silence on early tests</td><td>Board not booting</td><td>A stale <code>minicom</code> held <code>/dev/ttyUSB1</code> in an unwatched window; output went to an invisible buffer.</td></tr>
+      <tr><td>Boot mode jumper labelled SD</td><td>Board booting from SD</td><td>Jumper was on QSPI. Confirmed only via <code>BOOT_MODE</code> (<code>0xF800025C = 0x5</code> = SD). Every prior "SD test" had actually been a QSPI boot.</td></tr>
+      <tr><td><code>PC = 0x5490</code> when halted</td><td>Stuck in BootROM</td><td><code>XGlobalTimer_ModifyInterval</code> inside FSBL's polled SD read — normal polling, caught mid-transfer.</td></tr>
+      <tr><td><code>PC = 0x0409cae8</code> after run</td><td>Runaway / crash</td><td>Program had completed; <code>main()</code> returned and the CPU ran into unwritten DDR.</td></tr>
+      <tr><td>Repeated stack in <code>Xil_WaitForEvents</code></td><td>SD transfer hang</td><td>Polled-mode read spends nearly all its time there; halting at random lands in that loop with near-certainty.</td></tr>
+      <tr><td><code>xsct</code> "Invalid context"</td><td>Flaky JTAG cable</td><td>The CPU was resetting between commands — the reset loop itself, surfacing as a tooling error.</td></tr>
+    </table>
+  </div>
+  <div class="note">
+    <strong>General lesson:</strong> silence is not evidence. Before concluding a stage has failed,
+    confirm that a working version of that stage would actually produce output — that debug
+    printing is compiled in, the terminal is attached and visible, and the hardware is in the mode
+    you believe it's in.
+  </div>
+
+  <h2>Result</h2>
+  <p>
+    Board boots end to end: FSBL → U-Boot → <code>boot.scr</code> → <code>uImage</code> +
+    <code>system.dtb</code> → Linux → login prompt. Root filesystem mounts r/w on
+    <code>mmcblk0p2</code>, Ethernet links at 100 Mbps, console on <code>ttyPS0</code>. Two
+    device-tree properties were responsible for the entire multi-day failure; everything else
+    investigated (SD cards, QSPI, BootROM, PS7 clocks, DDR, MIO routing, FSBL integrity,
+    bare-metal toolchain) was ruled out by direct evidence, not inference, and didn't need fixing.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Stage</th><th>Expected output</th><th>Meaning</th></tr>
+      <tr><td>FSBL</td><td><code>SUCCESSFUL_HANDOFF</code> / <code>FSBL Status = 0xE0000000</code></td><td>Both partitions loaded; jumped to U-Boot at 0x04000000</td></tr>
+      <tr><td>U-Boot</td><td><code>Model: AuraScope Arty Z7-20</code> · <code>DRAM: 1 GiB</code> · <code>MMC: mmc@e0100000: 0</code></td><td>Console bound, DDR sized, SD controller probed</td></tr>
+      <tr><td>Script</td><td><code>Found U-Boot script /boot.scr</code></td><td>Partition 1 readable; boot script executing</td></tr>
+      <tr><td>Kernel</td><td><code>ttyPS0 … base_baud = 6250000</code></td><td>Clock tree correct — confirms <code>ps-clk-frequency</code></td></tr>
+      <tr><td>Rootfs</td><td><code>EXT4-fs (mmcblk0p2) … re-mounted r/w</code></td><td>Root filesystem mounted; init running</td></tr>
+    </table>
+  </div>
+
+  <h2>Still outstanding</h2>
+  <p>Nothing here blocks the next step, but all of it is real and worth tracking rather than rediscovering later:</p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Item</th><th>Detail</th><th>Suggested action</th></tr>
+      <tr><td>Random MAC address</td><td><code>eth0</code> gets a new random MAC every boot, so the DHCP lease changes too.</td><td>Add <code>local-mac-address</code> to <code>&amp;gem0</code>; reserve the address on the router.</td></tr>
+      <tr><td>DHCP race</td><td><code>udhcpc</code> gives up before the PHY finishes autonegotiation; link comes up after the login prompt.</td><td>Wait for carrier in <code>/etc/network/interfaces</code>, or move to <code>systemd-networkd</code>.</td></tr>
+      <tr><td>No SSH daemon</td><td><s>Neither <code>sshd</code> nor <code>dropbear</code> is installed.</s> Resolved — <code>dropbear</code> added to <code>IMAGE_INSTALL</code> and confirmed working over the network. See below.</td><td>Done.</td></tr>
+      <tr><td>U-Boot environment</td><td><code>No Valid Environment Area found</code> — <code>saveenv</code> won't persist.</td><td>Configure <code>CONFIG_ENV_IS_IN_FAT</code> for partition 1.</td></tr>
+      <tr><td>Prebuilt FSBL</td><td><code>fsbl.bbappend</code> supplies a committed ELF with an empty <code>DEPENDS</code>, so the <code>.xsa</code> isn't consumed by the build and can silently drift from it.</td><td>Re-evaluate the <code>meta-xilinx-standalone</code> build path, or add a CI check comparing the FSBL's <code>ps7_init</code> against the current <code>.xsa</code>.</td></tr>
+      <tr><td>No RTC</td><td><code>hwclock: can't open '/dev/misc/rtc'</code> — expected on this board.</td><td>Add NTP, or accept a fixed epoch at boot.</td></tr>
+    </table>
+  </div>
+  <div class="note">
+    <strong>Recommendation:</strong> commit <code>system-top.dts</code> with the explanatory
+    comments intact. Neither <code>serial0</code> nor <code>ps-clk-frequency</code> is
+    self-evident, and both would be easy to lose in a future refactor of the device tree.
+  </div>
+
+  <h2>SSH is in. USB isn't — yet</h2>
+  <p>
+    With the board on the network, <code>dropbear</code> came up cleanly — no separate debug
+    session needed anymore, just SSH from a normal terminal:
+  </p>
+  <pre class="code">$ ssh root@192.168.1.155
+<span class="c">The authenticity of host '192.168.1.155' can't be established.
+This key is not known by any other names.</span>
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+<span class="out">Warning: Permanently added '192.168.1.155' (ED25519) to the list of known hosts.
+
+WARNING: Poky is a reference Yocto Project distribution that should be used for
+testing and development purposes only. It is recommended that you create your
+own distribution for production use.
+
+root@aurascope-arty-z7:~#</span></pre>
+  <figure style="margin:0 0 16px;">
+    <img src="img/ssh-connect.png" alt="Terminal showing a successful SSH connection to root@aurascope-arty-z7, followed by lsusb not found and an ls /dev/tty* listing with no ttyUSB or ttyACM device present." style="width:100%; border-radius:var(--radius); border:1px solid var(--line); display:block;" />
+    <figcaption style="font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:6px;">First successful SSH session on the real board — dropbear, no debug UART needed.</figcaption>
+  </figure>
+  <p>
+    Next thing to check was whether the nRF5340 audio receiver — plugged into the board's USB
+    host port — was visible at all. It wasn't, and the first attempt didn't even get far enough
+    to say so properly:
+  </p>
+  <pre class="code">root@aurascope-arty-z7:~# lsusb
+<span class="err">-sh: lsusb: not found</span>
+root@aurascope-arty-z7:~# ls /dev/tty*
+<span class="out">/dev/tty    /dev/tty18  /dev/tty28  /dev/tty38  /dev/tty48  /dev/tty58
+... (tty0-tty63, all virtual consoles) ...
+/dev/ttyPS0</span></pre>
+  <div class="note">
+    <strong>Two separate gaps, not one:</strong> <code>lsusb</code> is missing because
+    <code>usbutils</code> was never added to <code>IMAGE_INSTALL</code> — a real gap, but a minor
+    one-line fix for a future rebuild. The more important signal is in the second command: only
+    the expected virtual consoles and <code>ttyPS0</code> show up. No <code>ttyUSB*</code>, no
+    <code>ttyACM*</code>, nothing at all from the USB host controller — the nRF5340 isn't
+    enumerating.
+  </div>
+  <p>
+    The likely cause isn't software: the board was still running powered from the JTAG/prog USB
+    connector during this test, which is enough to boot Linux but not enough current to also
+    power a downstream USB host port and whatever the nRF5340 dev kit draws while acting as a UAC
+    device. Two things to change before re-testing:
+  </p>
+  <ul>
+    <li>Switch the board to the dedicated 12 V wall power supply instead of USB/JTAG power.</li>
+    <li>Move the <code>JP5</code> jumper to select that external supply as the power source.</li>
+  </ul>
+  <p>
+    With real power behind the USB host port, the next check is whether the nRF5340 receiver's
+    UAC firmware actually enumerates as a USB sound card — that's the real goal of the wireless
+    audio phase, and the natural next step once power is sorted.
   </p>
 
   <h2>Code</h2>
-  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa">v0.2-custom-recipe</a>.</p>
+  <p>
+    Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope/releases/tag/v0.2-custom-recipe">v0.2-custom-recipe</a>
+    · code: <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope/tree/main/meta-aurascope">meta-aurascope</a>
+  </p>
 
   <nav class="stepnav">
     <a href="step-01.html">← previous</a>
