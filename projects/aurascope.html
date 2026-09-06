@@ -38,7 +38,6 @@
     font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
     color: var(--accent); margin: 38px 0 8px; padding-top: 18px; border-top: 1px solid var(--line);
   }
-  .phase.bonus { color: #b794f4; }
 
   /* step rows */
   .steps { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
@@ -59,9 +58,41 @@
     background: var(--accent-dim); color: var(--accent);
   }
   .step-tag.soon { background: #16181d; color: var(--muted); }
-  .step-tag.bonus { background: #241b33; color: #b794f4; }
+  .step-tag.next { background: #322507; color: var(--warn); }
+  .step.next { border-color: #4a3a10; }
+  .step.next:hover { border-color: var(--warn); }
+
+  /* "already working" callout */
+  .prebuilt {
+    background: var(--bg-elev); border: 1px solid var(--line);
+    border-left: 2px solid var(--accent); border-radius: var(--radius);
+    padding: 16px 18px; margin: 26px 0;
+  }
+  .prebuilt h4 {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 8px;
+  }
+  .prebuilt p { color: #b7bcc4; margin: 0 0 8px; font-size: .93rem; }
+  .prebuilt p:last-child { margin-bottom: 0; }
+
+  /* latest-state callout */
+  .latest {
+    background: #191307; border: 1px solid #4a3a10; border-radius: var(--radius);
+    padding: 14px 18px; margin: 22px 0 10px;
+  }
+  .latest strong {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--warn); display: block; margin-bottom: 6px;
+  }
+  .latest p { color: #b7bcc4; margin: 0; font-size: .92rem; }
 
   .legend { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 10px; }
+
+  .case code {
+    font-family: var(--mono); font-size: .88em; background: #16181d;
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; color: var(--accent);
+  }
+  .step-body code { color: var(--muted); background: #16181d; }
 
   /* hardware photo strip */
   .hw-photos {
@@ -117,7 +148,7 @@
     <div class="spec"><span>WIRELESS</span><strong>2× nRF5340 · Auracast (LC3)</strong></div>
     <div class="spec"><span>HOST</span><strong>Arty Z7-20 · Zynq-7000 · Yocto</strong></div>
     <div class="spec"><span>OBSERVABILITY</span><strong>kernel char driver + eBPF</strong></div>
-    <div class="spec"><span>STATUS</span><strong>shipping step by step</strong></div>
+    <div class="spec"><span>STATUS</span><strong>audio reaches ALSA on the Zynq</strong></div>
   </div>
 
   <div class="hw-photos">
@@ -132,45 +163,79 @@
   </div>
 
   <div class="progress-card">
-    <div><span class="status-tag">● IN PROGRESS</span><span class="label">Phase 1 — hardware defined in Vivado, Yocto consuming it</span></div>
+    <div><span class="status-tag">● IN PROGRESS</span><span class="label">The receiver enumerates as ALSA card 0 on the Arty</span></div>
     <a href="aurascope/progress.html">read the progress log →</a>
   </div>
 
   <h2>The idea</h2>
   <p>
     Take a Bluetooth LE Audio (Auracast) broadcast, receive it on an nRF5340, and present the
-    receiver to a Zynq-7000 Linux host as a plain USB sound card. Then make the whole audio
-    pipeline <em>observable</em> two different ways — from inside the kernel with a character
-    driver I write, and from outside with eBPF — and surface the data in a small live dashboard.
+    receiver to a Zynq-7000 Linux host as a plain USB sound card. Then make that audio pipeline
+    <em>observable</em> two different ways — from inside the kernel with a character driver I
+    write, and from outside with eBPF — and surface the data in a small live dashboard.
   </p>
   <p>
-    The point isn't just the gadget. It's to build it as a series of small, self-contained,
-    publishable steps that each teach one thing and each leave a tagged commit behind — so the
-    repo history itself tells the story from first boot to full integration.
+    The observability layer is the point. The wireless half is the delivery mechanism that gets
+    a real, live audio stream into Linux so there is something worth instrumenting.
   </p>
 
-  <div class="flow">nRF5340 #1            nRF5340 #2                 Arty Z7-20 (Zynq-7000)
-[Auracast TX] --BLE--> [RX → USB UAC] --USB--> [ snd-usb-audio → ALSA ]
-  Zephyr/LC3            Zephyr/LC3                       |
-                                          +-------------+--------------+
-                                          | char driver (/dev/audiomon) |  in-kernel
-                                          | eBPF probes  (kprobes)      |  external
-                                          | live dashboard (userspace)  |  output
-                                          +-----------------------------+</div>
+  <div class="prebuilt">
+    <h4>✓ Already built — the wireless half</h4>
+    <p>
+      Both nRF5340s are done and verified. One acts as a <strong>gateway</strong>: an I2S
+      microphone in, LC3 encode, Auracast broadcast out — two BIS streams at 48 kHz / 96 kbps,
+      one per channel. The other acts as a <strong>receiver</strong>: it syncs to both streams,
+      decodes LC3, and presents itself over USB as a standard USB Audio Class device.
+    </p>
+    <p>
+      Confirmed end to end on a dev host by feeding a 1 kHz sine into the gateway's mic and
+      recording it back off the USB sound card. The full logs and captures are in the
+      <a href="aurascope/progress.html" style="color:var(--accent)">progress log</a>. Because
+      this half is finished, it isn't broken out into build steps below — the numbered steps
+      pick up where the audio reaches Linux.
+    </p>
+  </div>
+
+  <div class="flow">          nRF5340 #1 (gateway)                    nRF5340 #2 (receiver)
+[ I2S mic -> LC3 encode -> Auracast TX ] --> [ RX -> LC3 decode -> USB UAC ]
+            ✓ already working                       ✓ already working
+                                                            |
+                                                           USB
+                                                            v
+                                                 Arty Z7-20 (Zynq-7000)
+                                       [ ChipIdea host -> snd-usb-audio -> ALSA ]
+                                                        ✓ working
+                                                            |
+                                     +----------------------+---------------------+
+                                     | char driver (/dev/audiomon)      in-kernel |
+                                     | eBPF probes  (kprobes)            external |
+                                     | live dashboard (userspace)          output |
+                                     +--------------------------------------------+</div>
 
   <h2>Why it's worth reading</h2>
   <ul>
-    <li><strong>Auracast / LC3</strong> on Zephyr — the new BLE Audio stack.</li>
-    <li><strong>Real Yocto</strong> — a custom image and recipes on a Zynq target, not a pre-baked distro.</li>
+    <li><strong>eBPF on embedded Linux</strong> — the same data the driver owns, observed from the outside, so you can see the tradeoff between the two approaches. This is the part I care most about.</li>
     <li><strong>A kernel module I actually wrote</strong> — file_operations, ioctls, sysfs, and correct locking.</li>
-    <li><strong>eBPF on embedded Linux</strong> — the same data the driver owns, observed from the outside, so you see the tradeoff between the two approaches.</li>
+    <li><strong>Real Yocto</strong> — a custom image and recipes on a Zynq target, not a pre-baked distro, including the device-tree and FSBL work needed to reach a login prompt.</li>
+    <li><strong>Auracast / LC3</strong> on Zephyr — the new BLE Audio stack, used here as the audio source rather than as the subject.</li>
   </ul>
 
   <h2>The build, step by step</h2>
   <p>Each step links to its own write-up as it ships. Greyed steps are planned but not yet published.</p>
 
+  <div class="latest">
+    <strong>Latest</strong>
+    <p>
+      The nRF5340 receiver is recognised on the Arty. <code>/proc/asound/cards</code> lists it
+      as card 0 — <code>snd-usb-audio</code> bound it, attached at <code>usb-ci_hdrc.0-1</code>,
+      which confirms the ChipIdea host controller came up in host mode from my device tree and
+      kernel config fragments. The wireless audio now has a path all the way into ALSA on the
+      Zynq. Next is proving audio actually flows through it end to end.
+    </p>
+  </div>
+
   <!-- PHASE 1 -->
-  <p class="phase">Phase 1 — Foundation: Linux on the Zynq</p>
+  <p class="phase">Phase 1 &mdash; Foundation: Linux on the Zynq</p>
   <div class="steps">
     <a class="step" href="aurascope/step-01.html">
       <span class="step-id">01</span>
@@ -179,98 +244,63 @@
     </a>
     <a class="step" href="aurascope/step-02.html">
       <span class="step-id">02</span>
-      <div class="step-body"><h3>Custom image &amp; recipe</h3><p>A layer + recipe deploying my own binary.</p></div>
+      <div class="step-body"><h3>Custom image &amp; recipe</h3><p>My own layer and recipes &mdash; through first boot, a login prompt, and SSH.</p></div>
       <span class="step-tag">v0.2</span>
-    </a>
-    <a class="step" href="aurascope/step-03.html">
-      <span class="step-id">03</span>
-      <div class="step-body"><h3>PS/PL: audio-status LED</h3><p>LED blinks on audio, solid on silence — Linux-driven via device tree + GPIO.</p></div>
-      <span class="step-tag soon">v0.3</span>
     </a>
   </div>
 
   <!-- PHASE 2 -->
-  <p class="phase">Phase 2 — Wireless audio: nRF5340 &amp; Auracast</p>
+  <p class="phase">Phase 2 &mdash; Getting the audio into Linux</p>
   <div class="steps">
-    <a class="step" href="aurascope/step-04.html">
+    <a class="step" href="aurascope/step-03.html">
+      <span class="step-id">03</span>
+      <div class="step-body"><h3>USB host + ALSA on the Zynq</h3><p>Device tree for the ChipIdea host port, permanent kernel config for USB + <code>snd-usb-audio</code>.</p></div>
+      <span class="step-tag">v0.3</span>
+    </a>
+    <a class="step next" href="aurascope/step-04.html">
       <span class="step-id">04</span>
-      <div class="step-body"><h3>Auracast transmitter</h3><p>One nRF5340 broadcasting an LC3 Auracast stream.</p></div>
-      <span class="step-tag soon">v0.4</span>
+      <div class="step-body"><h3>End-to-end streaming test</h3><p>Capture on the board itself; audio really flowing, first latency sanity check.</p></div>
+      <span class="step-tag next">UP NEXT</span>
     </a>
     <a class="step" href="aurascope/step-05.html">
       <span class="step-id">05</span>
-      <div class="step-body"><h3>Receiver as USB sound card</h3><p>Second nRF5340 enumerates over USB as a UAC device.</p></div>
+      <div class="step-body"><h3>Audio-status LED</h3><p>Blinks while audio is arriving, stops when the stream goes silent.</p></div>
       <span class="step-tag soon">v0.5</span>
-    </a>
-    <a class="step" href="aurascope/step-06.html">
-      <span class="step-id">06</span>
-      <div class="step-body"><h3>USB audio into Linux</h3><p>snd-usb-audio binds it; capture a WAV on the Arty.</p></div>
-      <span class="step-tag soon">v0.6</span>
     </a>
   </div>
 
   <!-- PHASE 3 -->
-  <p class="phase">Phase 3 — Observability: kernel module &amp; eBPF</p>
+  <p class="phase">Phase 3 &mdash; Observability: kernel module &amp; eBPF</p>
   <div class="steps">
+    <a class="step" href="aurascope/step-06.html">
+      <span class="step-id">06</span>
+      <div class="step-body"><h3>Char driver: /dev/audiomon</h3><p>In-kernel stats: file_operations, ioctl, sysfs, locking.</p></div>
+      <span class="step-tag soon">v0.6</span>
+    </a>
     <a class="step" href="aurascope/step-07.html">
       <span class="step-id">07</span>
-      <div class="step-body"><h3>Char driver: /dev/audiomon</h3><p>In-kernel stats: file_operations, ioctl, sysfs, locking.</p></div>
+      <div class="step-body"><h3>eBPF tracing</h3><p>kprobes on the ALSA write path; latency histograms.</p></div>
       <span class="step-tag soon">v0.7</span>
     </a>
     <a class="step" href="aurascope/step-08.html">
       <span class="step-id">08</span>
-      <div class="step-body"><h3>eBPF tracing</h3><p>kprobes on the ALSA write path; latency histograms.</p></div>
+      <div class="step-body"><h3>Live dashboard</h3><p>Userspace UI consuming both the driver and the eBPF data.</p></div>
       <span class="step-tag soon">v0.8</span>
-    </a>
-    <a class="step" href="aurascope/step-09.html">
-      <span class="step-id">09</span>
-      <div class="step-body"><h3>Live dashboard</h3><p>Userspace UI consuming both the driver and eBPF data.</p></div>
-      <span class="step-tag soon">v0.9</span>
     </a>
   </div>
 
   <!-- PHASE 4 -->
-  <p class="phase">Phase 4 — Integration &amp; publish</p>
+  <p class="phase">Phase 4 &mdash; Integration &amp; publish</p>
   <div class="steps">
-    <a class="step" href="aurascope/step-10.html">
-      <span class="step-id">10</span>
-      <div class="step-body"><h3>Full integration</h3><p>End-to-end: Auracast → Arty → monitor, with diagram.</p></div>
+    <a class="step" href="aurascope/step-09.html">
+      <span class="step-id">09</span>
+      <div class="step-body"><h3>Full integration</h3><p>End-to-end: Auracast &rarr; Arty &rarr; monitor, with diagram.</p></div>
       <span class="step-tag soon">v1.0</span>
     </a>
-    <a class="step" href="aurascope/step-11.html">
-      <span class="step-id">11</span>
+    <a class="step" href="aurascope/step-10.html">
+      <span class="step-id">10</span>
       <div class="step-body"><h3>Reflections</h3><p>What I'd change, what's next.</p></div>
-      <span class="step-tag soon">—</span>
-    </a>
-  </div>
-
-  <!-- PHASE 5 -->
-  <p class="phase bonus">Phase 5 — Advanced (bonus): I2S / FPGA audio path</p>
-  <div class="steps">
-    <a class="step" href="aurascope/step-12.html">
-      <span class="step-id">12</span>
-      <div class="step-body"><h3>nRF I2S output</h3><p>Receiver emits I2S clocking instead of USB.</p></div>
-      <span class="step-tag bonus">v1.1</span>
-    </a>
-    <a class="step" href="aurascope/step-13.html">
-      <span class="step-id">13</span>
-      <div class="step-body"><h3>PL I2S RX logic</h3><p>HDL receive logic in the Zynq fabric.</p></div>
-      <span class="step-tag bonus">v1.2</span>
-    </a>
-    <a class="step" href="aurascope/step-14.html">
-      <span class="step-id">14</span>
-      <div class="step-body"><h3>PL audio → Linux</h3><p>DMA + ASoC so fabric audio is an ALSA device.</p></div>
-      <span class="step-tag bonus">v1.3</span>
-    </a>
-    <a class="step" href="aurascope/step-14b.html">
-      <span class="step-id">14b</span>
-      <div class="step-body"><h3>PL-driven audio LED</h3><p>Fabric detects signal and drives the LED — zero CPU.</p></div>
-      <span class="step-tag bonus">v1.35</span>
-    </a>
-    <a class="step" href="aurascope/step-15.html">
-      <span class="step-id">15</span>
-      <div class="step-body"><h3>USB → FPGA port write-up</h3><p>Both transports compared; same observability layer reused.</p></div>
-      <span class="step-tag bonus">v1.4</span>
+      <span class="step-tag soon">&mdash;</span>
     </a>
   </div>
 

@@ -183,8 +183,6 @@ main, .topbar, .footer { position: relative; z-index: 1; }
 
 /* ---------- Contact ---------- */
 .contact { text-align: center; padding: 90px 24px; }
-.contact .section-title { margin-bottom: 12px; }
-.contact-sub { color: var(--muted); margin-bottom: 32px; }
 .contact-links { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 
 /* ---------- Footer ---------- */

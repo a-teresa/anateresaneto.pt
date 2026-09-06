@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AuraScope · Step 05 — Receiver as USB sound card</title>
-<meta name="description" content="Step 05 of AuraScope: Second nRF5340 receives, decodes LC3, and enumerates over USB as a UAC device." />
+<title>AuraScope · Step 05 — Audio-status LED</title>
+<meta name="description" content="Step 05 of AuraScope: An LED that blinks while audio is arriving and stops when the stream goes silent — driven from Linux off the live ALSA stream." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -56,12 +56,12 @@
 <main class="case">
   <p class="crumb"><a href="../../index.html#work">work</a> / <a href="../aurascope.html">aurascope</a> / step 05</p>
 
-  <span class="tagline">STEP 05 · TAG v0.5-nrf-uac</span>
-  <h1>Receiver as USB sound card</h1>
-  <p class="meta">// phase 2 · wireless audio · status: planned · published [date]</p>
+  <span class="tagline">STEP 05 · TAG v0.5-audio-led</span>
+  <h1>Audio-status LED</h1>
+  <p class="meta">// phase 2 · audio into linux · status: planned · published [date]</p>
 
   <h2>The goal of this step</h2>
-  <p>Second nRF5340 receives, decodes LC3, and enumerates over USB as a UAC device.</p>
+  <p>An LED that blinks while audio is arriving and stops when the stream goes silent — driven from Linux off the live ALSA stream.</p>
 
   <h2>What I did</h2>
   <ul>
@@ -81,12 +81,12 @@
   <p>[ The concrete, verifiable win for this step, and what it unlocks for the next one. ]</p>
 
   <h2>Code</h2>
-  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa">v0.5-nrf-uac</a>.</p>
+  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope">v0.5-audio-led</a>.</p>
 
   <nav class="stepnav">
     <a href="step-04.html">← previous</a>
     <a href="../aurascope.html">all steps</a>
-    <a href="step-06.html">next: USB audio into Linux →</a>
+    <a href="step-06.html">next: char driver →</a>
   </nav>
 </main>
 

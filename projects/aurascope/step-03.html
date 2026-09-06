@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AuraScope · Step 03 — PS/PL: audio-status LED</title>
-<meta name="description" content="Step 03 of AuraScope: Drive an LED from the audio stream via device tree + GPIO: blink on audio, solid on silence (Linux decides)." />
+<title>AuraScope · Step 03 — USB host + ALSA on the Zynq</title>
+<meta name="description" content="Step 03 of AuraScope: enabling the Zynq's ChipIdea USB0 controller in host mode via device tree, plus permanent kernel config fragments for the USB host stack and the generic USB Audio Class driver, so an Auracast receiver appears as an ALSA sound card." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -22,6 +22,8 @@
   .case p { color: #b7bcc4; margin-bottom: 14px; }
   .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
   .case li { margin-bottom: 6px; }
+  .case code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; color: var(--accent); }
   .tagline {
     display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
     background: var(--accent-dim); color: var(--accent);
@@ -32,9 +34,20 @@
     background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 16px; overflow-x: auto; margin: 8px 0 16px;
   }
+  pre.code .c { color: #6f7785; }
+  pre.code .out { color: #7fb88a; }
+  pre.code .err { color: #d98a8a; }
   .note {
     border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
     border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
+  }
+  .deadend {
+    border-left: 3px solid #b05050; background: #1a1212; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #e0bcbc; font-size: .92rem; margin: 16px 0;
+  }
+  .find {
+    border-left: 3px solid var(--accent); background: #0f1a14; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #cfe8d6; font-size: .92rem; margin: 16px 0;
   }
   .stepnav {
     display: flex; justify-content: space-between; gap: 12px; margin-top: 50px;
@@ -43,6 +56,15 @@
   .stepnav a { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
   .stepnav a:hover { color: var(--accent); }
   .stepnav .disabled { opacity: .35; pointer-events: none; }
+  .table-wrap { overflow-x: auto; margin: 8px 0 16px; }
+  .case table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .case th, .case td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .case th {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .5px; color: var(--muted);
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .case td { color: #b7bcc4; }
+  .case td code, .case th code { white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -56,37 +78,247 @@
 <main class="case">
   <p class="crumb"><a href="../../index.html#work">work</a> / <a href="../aurascope.html">aurascope</a> / step 03</p>
 
-  <span class="tagline">STEP 03 · TAG v0.3-audio-led</span>
-  <h1>PS/PL: audio-status LED</h1>
-  <p class="meta">// phase 1 · foundation · status: planned · published [date]</p>
+  <span class="tagline">STEP 03 · TAG v0.3-usb-audio</span>
+  <h1>USB host + ALSA on the Zynq</h1>
+  <p class="meta">// phase 2 · audio into linux · status: done, confirmed on hardware · published [date]</p>
 
   <h2>The goal of this step</h2>
-  <p>Drive an LED from the audio stream via device tree + GPIO: blink on audio, solid on silence (Linux decides).</p>
+  <p>
+    Turn the Zynq's USB0 controller into a working <em>host</em> port and teach the kernel enough
+    to recognise a USB Audio Class device on the end of it — so that when the nRF5340 Auracast
+    receiver is plugged in, <code>aplay -l</code> lists a sound card and ALSA can move audio.
+  </p>
+  <p>
+    Step 02 ended with the board booting, SSH working, and the receiver plugged into the USB host
+    port producing precisely nothing: no <code>ttyUSB*</code>, no <code>ttyACM*</code>, no sound
+    card. Part of that was power — the board was running off the JTAG connector, which can't
+    supply a downstream host port. But even with power fixed, nothing would have appeared,
+    because the software side of the USB host port didn't exist yet either.
+  </p>
 
-  <h2>What I did</h2>
+  <h2>Two halves, and both are mandatory</h2>
+  <p>
+    Enabling a peripheral on an SoC is always two separate assertions, made in two separate
+    places, that have to agree:
+  </p>
   <ul>
-    <li>[ first concrete thing ]</li>
-    <li>[ second concrete thing ]</li>
-    <li>[ third concrete thing ]</li>
+    <li>The <strong>device tree</strong> says <em>this hardware exists, here is its address, here is how it's wired.</em></li>
+    <li>The <strong>kernel config</strong> says <em>the driver that knows how to talk to it is compiled in.</em></li>
   </ul>
+  <div class="find">
+    <strong>The failure mode worth internalising:</strong> a device-tree node with no driver, and
+    a driver with no device-tree node, produce the <em>same</em> symptom — silence. No error, no
+    warning, no probe message, just a device that never appears. Neither half is diagnosable from
+    the other's absence, which is exactly what makes this class of bug expensive. You have to
+    verify both independently.
+  </div>
 
-  <h2>The tricky part</h2>
-  <p>[ The one thing that actually cost time. Be specific and honest — this is the section readers remember. ]</p>
+  <h2>Half one — the device tree</h2>
+  <p>
+    Zynq-7000's USB0 is a ChipIdea controller with an external ULPI transceiver. Two nodes are
+    needed: an override on <code>&amp;usb0</code> to switch it on and put it in host mode, and the
+    PHY node it points at. Both went into the same
+    <code>system-top.dts</code> that step 02 established:
+  </p>
+  <pre class="code"><span class="c">/* meta-aurascope/recipes-bsp/device-tree/files/system-top.dts */</span>
 
-  <pre class="code"># [ the handful of commands / code that matter — keep it copy-pasteable ]</pre>
+&amp;usb0 {
+    status   = "okay";
+    dr_mode  = "host";
+    usb-phy  = &lt;&amp;usb_phy0&gt;;
+};
 
-  <div class="note"><strong>Honest note:</strong> [ anything simulated, stubbed, or deferred at this stage — state it plainly. ]</div>
+/ {
+    usb_phy0: phy0@e0002000 {
+        compatible = "ulpi-phy";
+        #phy-cells = &lt;0&gt;;
+        reg        = &lt;0xe0002000 0x1000&gt;;
+        view-port  = &lt;0x0170&gt;;
+        drv-vbus;
+    };
+};</pre>
+  <p>
+    <code>dr_mode = "host"</code> is the important line: the controller is dual-role, and left to
+    itself it does not default to host. <code>drv-vbus</code> tells the PHY to actually drive VBUS
+    onto the port, which is what lets a downstream device power up at all — and is the reason the
+    power supply from step 02 matters even after the software is right.
+  </p>
+  <p>
+    No recipe changes were needed to carry this: the <code>device-tree.bbappend</code> written in
+    step 02 already prepends <code>FILESEXTRAPATHS</code> and pulls <code>system-top.dts</code>
+    in through <code>SRC_URI</code>, so editing the <code>.dts</code> is enough.
+  </p>
 
-  <h2>Result</h2>
-  <p>[ The concrete, verifiable win for this step, and what it unlocks for the next one. ]</p>
+  <h2>Half two — kernel config, made permanent</h2>
+  <p>
+    The tempting move here is <code>bitbake -c menuconfig virtual/kernel</code>, tick the boxes,
+    and move on. That works exactly once. The resulting <code>.config</code> lives in the work
+    directory and is destroyed by the next <code>cleansstate</code>, kernel version bump, or fresh
+    clone — and it leaves no trace in the repo explaining what was changed or why.
+  </p>
+  <p>
+    The reproducible form is a <strong>config fragment</strong>: a <code>.cfg</code> file of bare
+    <code>CONFIG_*</code> lines, delivered through <code>SRC_URI</code>, which the kernel recipe
+    merges into the defconfig at build time. It's in git, it's reviewable, and it survives
+    everything.
+  </p>
+  <pre class="code"><span class="c"># meta-aurascope/recipes-kernel/linux/linux-xlnx_%.bbappend</span>
+
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
+
+SRC_URI += "file://usb-host.cfg"
+SRC_URI += "file://sound-core.cfg"</pre>
+  <div class="note">
+    <strong>Note the filename.</strong> <code>linux-xlnx_%.bbappend</code> — the <code>%</code> is
+    a wildcard that matches whichever <code>linux-xlnx_&lt;version&gt;.bb</code> the BSP currently
+    selects. A bbappend named for a specific version silently stops applying the moment the BSP
+    moves to a new kernel, and a bbappend that stops applying is another silent failure with no
+    error attached to it. Same <code>:=</code> discipline as the <code>FSBL_FILE</code> lesson in
+    step 02, for the same reason: <code>THISDIR</code> has to be captured at parse time.
+  </div>
+
+  <h3 style="font-size:1rem;margin:26px 0 10px;">usb-host.cfg — the controller stack</h3>
+  <pre class="code"><span class="c"># meta-aurascope/recipes-kernel/linux/linux-xlnx/usb-host.cfg</span>
+
+CONFIG_USB=y
+CONFIG_USB_CHIPIDEA=y
+CONFIG_USB_CHIPIDEA_HOST=y
+CONFIG_USB_EHCI_HCD=y
+CONFIG_USB_EHCI_ROOT_HUB_TT=y
+CONFIG_NOP_USB_XCEIV=y
+CONFIG_USB_PHY=y
+CONFIG_USB_ULPI=y
+CONFIG_USB_STORAGE=y</pre>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Symbol</th><th>Why it's here</th></tr>
+      <tr><td><code>USB_CHIPIDEA</code></td><td>The Zynq-7000's USB IP is a ChipIdea core. Without this there is no driver for the controller at all.</td></tr>
+      <tr><td><code>USB_CHIPIDEA_HOST</code></td><td>ChipIdea is dual-role; this is the half that does host. The device-tree <code>dr_mode</code> selects it, but only if it was compiled.</td></tr>
+      <tr><td><code>USB_EHCI_HCD</code></td><td>ChipIdea's host side is EHCI-based and layers on the generic EHCI host controller driver.</td></tr>
+      <tr><td><code>USB_EHCI_ROOT_HUB_TT</code></td><td>Transaction translator in the root hub — needed for full/low-speed devices on an EHCI controller with no companion UHCI/OHCI.</td></tr>
+      <tr><td><code>USB_PHY</code>, <code>USB_ULPI</code></td><td>The PHY framework and ULPI support, matching the <code>usb_phy0</code> node in the device tree.</td></tr>
+      <tr><td><code>NOP_USB_XCEIV</code></td><td>Generic no-op transceiver the ChipIdea glue falls back on during probe.</td></tr>
+      <tr><td><code>USB_STORAGE</code></td><td>Not needed for audio — but a USB stick is the cheapest way to prove the host port enumerates <em>anything</em>, independent of the nRF5340.</td></tr>
+    </table>
+  </div>
+
+  <h3 style="font-size:1rem;margin:26px 0 10px;">sound-core.cfg — ALSA and the UAC driver</h3>
+  <p>
+    The image built so far had no sound subsystem whatsoever, so this is being added from zero.
+    The receiver presents itself as a standard USB Audio Class device, which means no bespoke
+    driver is needed — the generic <code>snd-usb-audio</code> handles it:
+  </p>
+  <pre class="code"><span class="c"># meta-aurascope/recipes-kernel/linux/linux-xlnx/sound-core.cfg</span>
+
+CONFIG_SOUND=y
+CONFIG_SND=y
+CONFIG_SND_USB=y
+CONFIG_SND_USB_AUDIO=y</pre>
+  <div class="find">
+    <strong>This is where the project's shape pays off.</strong> Because the nRF5340 speaks
+    standard UAC rather than something proprietary, the Linux side is four config symbols and no
+    custom code. The interesting engineering isn't in getting audio <em>in</em> — it's in what
+    gets instrumented once it's there, which is what phase 3 is about.
+  </div>
+
+  <h2>Userspace — the part the kernel config doesn't give you</h2>
+  <p>
+    Enabling <code>snd-usb-audio</code> creates the device; it does not install a single tool to
+    look at it. Step 02 already hit the userspace version of this trap, where <code>lsusb</code>
+    turned out to be missing because <code>usbutils</code> was never in the image. Same fix,
+    applied ahead of time this round:
+  </p>
+  <pre class="code"><span class="c"># meta-aurascope/recipes-core/images/aurascope-image.bb</span>
+
+IMAGE_INSTALL:append = " alsa-utils alsa-lib"</pre>
+  <p>
+    That brings <code>aplay</code>, <code>arecord</code>, <code>amixer</code>,
+    <code>alsamixer</code> and <code>speaker-test</code> onto the rootfs.
+  </p>
+
+  <h2>Rebuild</h2>
+  <pre class="code"><span class="c"># once per shell session, from aurascope-yocto/</span>
+$ source poky/oe-init-build-env build
+
+<span class="c"># then from build/</span>
+$ bitbake virtual/kernel
+$ bitbake aurascope-image</pre>
+  <p>
+    Config fragments are easy to get wrong silently — a typo'd symbol, or a symbol whose
+    dependencies aren't met, is simply dropped without complaint. So the check is not "did the
+    build succeed" but "did these symbols actually survive into the config":
+  </p>
+  <pre class="code">$ bitbake -e virtual/kernel | grep -E 'CHIPIDEA|EHCI_HCD|SND_USB'</pre>
+  <div class="note">
+    <strong>If a fragment appears to be ignored:</strong> normally the <code>SRC_URI</code> change
+    is picked up on its own, but a stale sstate cache can hide it. <code>bitbake -c cleansstate
+    virtual/kernel</code> followed by a fresh <code>bitbake virtual/kernel</code> forces the issue.
+  </div>
+
+  <h2>The card shows up</h2>
+  <p>
+    With the board moved onto its 12&nbsp;V supply and the <code>JP5</code> jumper repositioned so
+    the USB host port can actually source VBUS, the receiver enumerates and Linux registers it as
+    a sound card:
+  </p>
+  <pre class="code">root@aurascope-arty-z7:~# cat /proc/asound/cards
+<span class="out"> 0 [Audio          ]: USB-Audio - nRF5340 USB Audio
+                      Nordic Semiconductor AS nRF5340 USB Audio at usb-ci_hdrc.0-1, full speed</span></pre>
+  <figure style="margin:0 0 16px;">
+    <img src="img/usb-audio-card.png" alt="Terminal on the Arty showing cat /proc/asound/cards listing card 0 as USB-Audio, nRF5340 USB Audio from Nordic Semiconductor, attached at usb-ci_hdrc.0-1 at full speed." style="width:100%; border-radius:var(--radius); border:1px solid var(--line); display:block;" />
+    <figcaption style="font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:6px;">The nRF5340 Auracast receiver enumerated as ALSA card 0 on the Arty Z7-20.</figcaption>
+  </figure>
+  <div class="find">
+    <strong>Every claim on this page is in that one line.</strong> <code>USB-Audio</code> means
+    <code>snd-usb-audio</code> bound it, so <code>sound-core.cfg</code> took.
+    <code>usb-ci_hdrc.0-1</code> is the giveaway for the other half: <code>ci_hdrc</code> is the
+    ChipIdea host controller, so the <code>&amp;usb0</code> device-tree node <em>and</em>
+    <code>usb-host.cfg</code> both landed — the controller probed, came up in host mode, and
+    enumerated a device on port 1. Both halves, confirmed independently, from one command.
+  </div>
+  <p>
+    <code>full speed</code> is worth noting rather than worrying about: that's USB 1.1 signalling
+    at 12&nbsp;Mbit/s, not the 480&nbsp;Mbit/s the EHCI controller is capable of. It's the
+    receiver's choice, not a fault in the host — and it's normal for USB Audio Class devices,
+    which are specified to work at full speed. Stereo 48&nbsp;kHz / 16-bit is about
+    1.5&nbsp;Mbit/s, so there is a comfortable margin. If the streaming test in step 04 turns up
+    dropouts, though, this is the first number to come back and re-examine.
+  </p>
+  <p>
+    For completeness, the same check from the other direction — that the symbols really are in the
+    running kernel rather than merely in the recipe:
+  </p>
+  <pre class="code">$ zcat /proc/config.gz | grep -iE 'chipidea|ehci_hcd|snd_usb'</pre>
+  <div class="note">
+    <strong>Worth keeping as a habit:</strong> because the two halves fail identically, a plain USB
+    stick in the same port is a cheap tiebreaker when something doesn't enumerate — it exercises
+    the host controller and PHY with nothing audio-specific involved. If the stick works and the
+    receiver doesn't, the problem is the receiver or its firmware; if neither works, it's the
+    port. That's what <code>USB_STORAGE</code> is doing in the config fragment.
+  </div>
+
+  <h2>Files</h2>
+  <div class="table-wrap">
+    <table>
+      <tr><th></th><th>Path</th><th>What it does</th></tr>
+      <tr><td>M</td><td><code>recipes-bsp/device-tree/files/system-top.dts</code></td><td><code>&amp;usb0</code> host-mode override + <code>usb_phy0</code> ULPI node</td></tr>
+      <tr><td>A</td><td><code>recipes-kernel/linux/linux-xlnx_%.bbappend</code></td><td>Pulls both config fragments into the kernel build, version-independently</td></tr>
+      <tr><td>A</td><td><code>recipes-kernel/linux/linux-xlnx/usb-host.cfg</code></td><td>ChipIdea + EHCI + ULPI PHY host stack</td></tr>
+      <tr><td>A</td><td><code>recipes-kernel/linux/linux-xlnx/sound-core.cfg</code></td><td>ALSA core + generic USB Audio Class driver</td></tr>
+      <tr><td>M</td><td><code>recipes-core/images/aurascope-image.bb</code></td><td>Adds <code>alsa-utils</code> and <code>alsa-lib</code> to the rootfs</td></tr>
+    </table>
+  </div>
 
   <h2>Code</h2>
-  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa">v0.3-audio-led</a>.</p>
+  <p>
+    Commit <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope/commit/47a38cf83d08a4796346f745cb189001688ef5d0">47a38cf</a>
+    · code: <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope/tree/main/meta-aurascope">meta-aurascope</a>
+  </p>
 
   <nav class="stepnav">
     <a href="step-02.html">← previous</a>
     <a href="../aurascope.html">all steps</a>
-    <a href="step-04.html">next: Auracast TX →</a>
+    <a href="step-04.html">next: streaming test →</a>
   </nav>
 </main>
 
