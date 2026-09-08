@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>AuraScope · Step 06 — Char driver: /dev/audiomon</title>
-<meta name="description" content="Step 06 of AuraScope: In-kernel stats on the audio path: file_operations, ioctl, sysfs, and correct locking." />
+<meta name="description" content="Step 06 of AuraScope: In-kernel stats on the same audio path eBPF is already watching: file_operations, ioctl, sysfs, and correct locking — the inside view to set against the outside one." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -22,6 +22,8 @@
   .case p { color: #b7bcc4; margin-bottom: 14px; }
   .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
   .case li { margin-bottom: 6px; }
+  .case code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; color: var(--accent); }
   .tagline {
     display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
     background: var(--accent-dim); color: var(--accent);
@@ -32,9 +34,20 @@
     background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 16px; overflow-x: auto; margin: 8px 0 16px;
   }
+  pre.code .c { color: #6f7785; }
+  pre.code .out { color: #7fb88a; }
+  pre.code .err { color: #d98a8a; }
   .note {
     border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
     border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
+  }
+  .deadend {
+    border-left: 3px solid #b05050; background: #1a1212; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #e0bcbc; font-size: .92rem; margin: 16px 0;
+  }
+  .find {
+    border-left: 3px solid var(--accent); background: #0f1a14; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #cfe8d6; font-size: .92rem; margin: 16px 0;
   }
   .stepnav {
     display: flex; justify-content: space-between; gap: 12px; margin-top: 50px;
@@ -43,6 +56,17 @@
   .stepnav a { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
   .stepnav a:hover { color: var(--accent); }
   .stepnav .disabled { opacity: .35; pointer-events: none; }
+  .table-wrap { overflow-x: auto; margin: 8px 0 16px; }
+  .case table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .case th, .case td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .case th {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .5px; color: var(--muted);
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .case td { color: #b7bcc4; }
+  .case td code, .case th code { white-space: nowrap; }
+  .case td:first-child { font-family: var(--mono); font-size: .78rem;
+    text-transform: uppercase; letter-spacing: .5px; color: var(--muted); white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -61,7 +85,7 @@
   <p class="meta">// phase 3 · observability · status: planned · published [date]</p>
 
   <h2>The goal of this step</h2>
-  <p>In-kernel stats on the audio path: file_operations, ioctl, sysfs, and correct locking.</p>
+  <p>In-kernel stats on the same audio path eBPF is already watching: file_operations, ioctl, sysfs, and correct locking — the inside view to set against the outside one.</p>
 
   <h2>What I did</h2>
   <ul>
@@ -86,7 +110,7 @@
   <nav class="stepnav">
     <a href="step-05.html">← previous</a>
     <a href="../aurascope.html">all steps</a>
-    <a href="step-07.html">next: eBPF tracing →</a>
+    <a href="step-07.html">next: full integration →</a>
   </nav>
 </main>
 

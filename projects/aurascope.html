@@ -148,7 +148,7 @@
     <div class="spec"><span>WIRELESS</span><strong>2× nRF5340 · Auracast (LC3)</strong></div>
     <div class="spec"><span>HOST</span><strong>Arty Z7-20 · Zynq-7000 · Yocto</strong></div>
     <div class="spec"><span>OBSERVABILITY</span><strong>kernel char driver + eBPF</strong></div>
-    <div class="spec"><span>STATUS</span><strong>audio reaches ALSA on the Zynq</strong></div>
+    <div class="spec"><span>STATUS</span><strong>streaming live · eBPF tracing on</strong></div>
   </div>
 
   <div class="hw-photos">
@@ -163,7 +163,7 @@
   </div>
 
   <div class="progress-card">
-    <div><span class="status-tag">● IN PROGRESS</span><span class="label">The receiver enumerates as ALSA card 0 on the Arty</span></div>
+    <div><span class="status-tag">● IN PROGRESS</span><span class="label">Live dashboard on the board, with eBPF kprobes feeding it</span></div>
     <a href="aurascope/progress.html">read the progress log →</a>
   </div>
 
@@ -207,9 +207,9 @@
                                                         ✓ working
                                                             |
                                      +----------------------+---------------------+
+                                     | eBPF probes (kprobes via ply)   ✓ external |
+                                     | live dashboard (aurascope-dash)   ✓ output |
                                      | char driver (/dev/audiomon)      in-kernel |
-                                     | eBPF probes  (kprobes)            external |
-                                     | live dashboard (userspace)          output |
                                      +--------------------------------------------+</div>
 
   <h2>Why it's worth reading</h2>
@@ -226,11 +226,11 @@
   <div class="latest">
     <strong>Latest</strong>
     <p>
-      The nRF5340 receiver is recognised on the Arty. <code>/proc/asound/cards</code> lists it
-      as card 0 — <code>snd-usb-audio</code> bound it, attached at <code>usb-ci_hdrc.0-1</code>,
-      which confirms the ChipIdea host controller came up in host mode from my device tree and
-      kernel config fragments. The wireless audio now has a path all the way into ALSA on the
-      Zynq. Next is proving audio actually flows through it end to end.
+      Audio is flowing and instrumented. <code>aurascope-dash</code> runs on the board serving a
+      live scope — waveform, spectrum and 30&nbsp;s of level history — and eBPF kprobes on the ALSA
+      hot path now feed a period-latency histogram and xrun counter into the same page. 6052 period
+      events, all in the 16–32&nbsp;ms bucket, zero xruns. Next is the character driver, so the
+      same data can be compared from inside the kernel.
     </p>
   </div>
 
@@ -257,48 +257,43 @@
       <div class="step-body"><h3>USB host + ALSA on the Zynq</h3><p>Device tree for the ChipIdea host port, permanent kernel config for USB + <code>snd-usb-audio</code>.</p></div>
       <span class="step-tag">v0.3</span>
     </a>
-    <a class="step next" href="aurascope/step-04.html">
+    <a class="step" href="aurascope/step-04.html">
       <span class="step-id">04</span>
-      <div class="step-body"><h3>End-to-end streaming test</h3><p>Capture on the board itself; audio really flowing, first latency sanity check.</p></div>
-      <span class="step-tag next">UP NEXT</span>
-    </a>
-    <a class="step" href="aurascope/step-05.html">
-      <span class="step-id">05</span>
-      <div class="step-body"><h3>Audio-status LED</h3><p>Blinks while audio is arriving, stops when the stream goes silent.</p></div>
-      <span class="step-tag soon">v0.5</span>
+      <div class="step-body"><h3>Streaming, and a scope to watch it with</h3><p>Audio confirmed flowing, and a live dashboard: instantaneous waveform + spectrum, plus 30&nbsp;s of level history.</p></div>
+      <span class="step-tag">v0.4</span>
     </a>
   </div>
 
   <!-- PHASE 3 -->
-  <p class="phase">Phase 3 &mdash; Observability: kernel module &amp; eBPF</p>
+  <p class="phase">Phase 3 &mdash; Observability: eBPF &amp; kernel module</p>
   <div class="steps">
-    <a class="step" href="aurascope/step-06.html">
+    <a class="step" href="aurascope/step-05.html">
+      <span class="step-id">05</span>
+      <div class="step-body"><h3>eBPF in the same dashboard</h3><p>kprobes on the ALSA hot path via ply &mdash; latency histogram and xrun counter, merged into the same feed.</p></div>
+      <span class="step-tag">v0.5</span>
+    </a>
+    <a class="step next" href="aurascope/step-06.html">
       <span class="step-id">06</span>
-      <div class="step-body"><h3>Char driver: /dev/audiomon</h3><p>In-kernel stats: file_operations, ioctl, sysfs, locking.</p></div>
-      <span class="step-tag soon">v0.6</span>
-    </a>
-    <a class="step" href="aurascope/step-07.html">
-      <span class="step-id">07</span>
-      <div class="step-body"><h3>eBPF tracing</h3><p>kprobes on the ALSA write path; latency histograms.</p></div>
-      <span class="step-tag soon">v0.7</span>
-    </a>
-    <a class="step" href="aurascope/step-08.html">
-      <span class="step-id">08</span>
-      <div class="step-body"><h3>Live dashboard</h3><p>Userspace UI consuming both the driver and the eBPF data.</p></div>
-      <span class="step-tag soon">v0.8</span>
+      <div class="step-body"><h3>Char driver: /dev/audiomon</h3><p>The inside view to set against eBPF's outside one: file_operations, ioctl, sysfs, locking.</p></div>
+      <span class="step-tag next">UP NEXT</span>
     </a>
   </div>
 
   <!-- PHASE 4 -->
   <p class="phase">Phase 4 &mdash; Integration &amp; publish</p>
   <div class="steps">
-    <a class="step" href="aurascope/step-09.html">
-      <span class="step-id">09</span>
-      <div class="step-body"><h3>Full integration</h3><p>End-to-end: Auracast &rarr; Arty &rarr; monitor, with diagram.</p></div>
+    <a class="step" href="aurascope/step-07.html">
+      <span class="step-id">07</span>
+      <div class="step-body"><h3>Full integration</h3><p>End-to-end, with both observability layers running side by side.</p></div>
       <span class="step-tag soon">v1.0</span>
     </a>
-    <a class="step" href="aurascope/step-10.html">
-      <span class="step-id">10</span>
+    <a class="step" href="aurascope/step-08.html">
+      <span class="step-id">08</span>
+      <div class="step-body"><h3>Audio-status LED</h3><p>Blinks while audio is arriving, stops when the stream goes silent &mdash; the physical version of what the dashboard plots.</p></div>
+      <span class="step-tag soon">v1.1</span>
+    </a>
+    <a class="step" href="aurascope/step-09.html">
+      <span class="step-id">09</span>
       <div class="step-body"><h3>Reflections</h3><p>What I'd change, what's next.</p></div>
       <span class="step-tag soon">&mdash;</span>
     </a>

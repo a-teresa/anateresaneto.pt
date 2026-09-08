@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AuraScope · Step 04 — End-to-end streaming test</title>
-<meta name="description" content="Step 04 of AuraScope: arecord and aplay on the board itself — audio actually flowing from the mic to the Zynq, plus a first latency sanity check." />
+<title>AuraScope · Step 04 — Streaming, and a scope to watch it with</title>
+<meta name="description" content="Step 04 of AuraScope: proving audio really flows from Auracast into ALSA on the Zynq, and building aurascope-dash — a C daemon that captures from ALSA and serves a live waveform, spectrum and 30-second level history over Server-Sent Events." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -22,6 +22,8 @@
   .case p { color: #b7bcc4; margin-bottom: 14px; }
   .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
   .case li { margin-bottom: 6px; }
+  .case code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; color: var(--accent); }
   .tagline {
     display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
     background: var(--accent-dim); color: var(--accent);
@@ -32,9 +34,20 @@
     background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 16px; overflow-x: auto; margin: 8px 0 16px;
   }
+  pre.code .c { color: #6f7785; }
+  pre.code .out { color: #7fb88a; }
+  pre.code .err { color: #d98a8a; }
   .note {
     border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
     border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
+  }
+  .deadend {
+    border-left: 3px solid #b05050; background: #1a1212; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #e0bcbc; font-size: .92rem; margin: 16px 0;
+  }
+  .find {
+    border-left: 3px solid var(--accent); background: #0f1a14; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #cfe8d6; font-size: .92rem; margin: 16px 0;
   }
   .stepnav {
     display: flex; justify-content: space-between; gap: 12px; margin-top: 50px;
@@ -43,6 +56,26 @@
   .stepnav a { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
   .stepnav a:hover { color: var(--accent); }
   .stepnav .disabled { opacity: .35; pointer-events: none; }
+  .table-wrap { overflow-x: auto; margin: 8px 0 16px; }
+  .case table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .case th, .case td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .case th {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .5px; color: var(--muted);
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .case td { color: #b7bcc4; }
+  .case td code, .case th code { white-space: nowrap; }
+  figure.cap { margin: 18px 0 8px; }
+  figure.cap img { width: 100%; display: block;
+    border: 1px solid var(--line); border-radius: var(--radius); }
+  figure.cap figcaption { font-family: var(--mono); font-size: 11.5px;
+    color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  ul.figlegend { list-style: none; margin: 12px 0 20px; padding: 0; }
+  ul.figlegend li { color: #a9b0ba; font-size: .9rem; margin-bottom: 7px;
+    padding-left: 14px; border-left: 2px solid var(--line); }
+  ul.figlegend b { color: #cfd6df; font-weight: 600; }
+  .case td:first-child { font-family: var(--mono); font-size: .78rem;
+    text-transform: uppercase; letter-spacing: .5px; color: var(--muted); white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -56,37 +89,182 @@
 <main class="case">
   <p class="crumb"><a href="../../index.html#work">work</a> / <a href="../aurascope.html">aurascope</a> / step 04</p>
 
-  <span class="tagline">STEP 04 · TAG v0.4-audio-streaming</span>
-  <h1>End-to-end streaming test</h1>
-  <p class="meta">// phase 2 · audio into linux · status: planned · published [date]</p>
+  <span class="tagline">STEP 04 · TAG v0.4-dashboard</span>
+  <h1>Streaming, and a scope to watch it with</h1>
+  <p class="meta">// phase 2 · audio into linux · status: done, running on the board · published [date]</p>
 
   <h2>The goal of this step</h2>
-  <p>arecord and aplay on the board itself — audio actually flowing from the mic to the Zynq, plus a first latency sanity check.</p>
-
-  <h2>What I did</h2>
+  <p>
+    Step 03 ended with the receiver enumerated as ALSA card 0. That proves the kernel
+    <em>found</em> the device. It says nothing about whether audio is actually arriving, or whether
+    what arrives is correct. This step closes that gap — and does it with something I can leave
+    running and glance at, rather than a one-shot command.
+  </p>
+  <p>
+    The result is <code>aurascope-dash</code>: a small C program on the board that captures from
+    ALSA, computes levels and a spectrum, and serves a live dashboard over HTTP. Two views, which
+    answer two different questions:
+  </p>
   <ul>
-    <li>[ first concrete thing ]</li>
-    <li>[ second concrete thing ]</li>
-    <li>[ third concrete thing ]</li>
+    <li><strong>Instantaneous</strong> — what does the signal look like <em>right now</em>? Waveform, spectrum, level meter.</li>
+    <li><strong>The last 30 seconds</strong> — has it been behaving? A rolling RMS and peak trace.</li>
   </ul>
 
-  <h2>The tricky part</h2>
-  <p>[ The one thing that actually cost time. Be specific and honest — this is the section readers remember. ]</p>
+  <h2>Why <code>arecord</code> isn't enough</h2>
+  <p>
+    <code>arecord -d 5 test.wav</code> proves bytes moved. It does not tell you the signal is
+    <em>right</em>, and it can't be watched while you change something at the other end of the
+    link. Most of what I actually wanted to know is temporal: does the level hold steady, does it
+    drop out when I walk away from the transmitter, does the noise floor sit where it should.
+  </p>
+  <div class="find">
+    <strong>The distinction that made this worth building:</strong> a dropout lasting 40&nbsp;ms is
+    completely invisible in a waveform frame — the frame is only about 10&nbsp;ms wide, so the gap
+    either fills the whole view or has already scrolled past. In a 30-second RMS trace the same
+    dropout is an obvious notch. The instantaneous view tells you what the signal <em>is</em>; the
+    history tells you what it has been <em>doing</em>. Neither substitutes for the other, which is
+    why both are on the page.
+  </div>
 
-  <pre class="code"># [ the handful of commands / code that matter — keep it copy-pasteable ]</pre>
+  <h2>Capturing the audio</h2>
+  <p>
+    <code>audio.c</code> opens the PCM device and runs a detached capture thread. The parameters
+    are deliberately unambitious — this is a monitor, not a recorder:
+  </p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Parameter</th><th>Value</th><th>Why</th></tr>
+      <tr><td>Rate</td><td>48000 Hz</td><td>Matches the Auracast/LC3 chain end to end, so nothing resamples.</td></tr>
+      <tr><td>Format</td><td><code>SND_PCM_FORMAT_S16_LE</code></td><td>What the UAC device presents; no conversion needed.</td></tr>
+      <tr><td>Channels</td><td>1, falling back to 2</td><td>Mono is enough to monitor; the fallback stops a channel-count mismatch from being fatal.</td></tr>
+      <tr><td>Period</td><td>512 frames</td><td>≈10.7 ms — fast enough to feel live, large enough that the wakeup rate is not a burden on a Cortex-A9.</td></tr>
+      <tr><td><code>FFT_SIZE</code></td><td>1024</td><td>≈47 Hz per bin at 48 kHz.</td></tr>
+      <tr><td><code>WAVE_POINTS</code></td><td>256</td><td>Waveform decimated by <code>stride = FFT_SIZE / WAVE_POINTS</code>.</td></tr>
+      <tr><td><code>SPEC_BARS</code></td><td>64</td><td>Bins folded down to something a browser can draw legibly.</td></tr>
+    </table>
+  </div>
 
-  <div class="note"><strong>Honest note:</strong> [ anything simulated, stubbed, or deferred at this stage — state it plainly. ]</div>
+  <h2>What gets computed each period</h2>
+  <p>
+    RMS and peak are the two numbers that matter, both in dB relative to full scale, with the
+    <code>+ 1e-9f</code> guard that stops digital silence turning into <code>-inf</code>:
+  </p>
+  <pre class="code">rms = sqrtf((float)(sq_sum / (double)n));
+rms_db  = 20.0f * log10f(rms  + 1e-9f);
+peak_db = 20.0f * log10f(peak + 1e-9f);</pre>
+  <p>
+    Peak alone is too twitchy to read on a moving meter, so there's a separate held value that
+    jumps instantly to a new maximum and then bleeds away at <code>peak_hold_db -= 0.3f</code> per
+    period — about 28&nbsp;dB per second. Fast enough to follow real changes, slow enough that a
+    transient stays on screen long enough to see.
+  </p>
+  <p>
+    The spectrum is a 1024-point FFT with a Hann window applied first
+    (<code>fft_hann_window()</code>). The window is not optional: an FFT implicitly assumes the
+    block repeats forever, and a sine that doesn't fit a whole number of cycles into the block
+    produces a discontinuity at the seam. Untapered, that smears energy across every bin —
+    a single clean tone comes out looking like broadband noise. Hann tapers both ends to zero and
+    the tone lands where it belongs.
+  </p>
+
+  <h2>Getting it to a browser</h2>
+  <p>
+    Everything lands in one <code>audio_snapshot_t</code> guarded by a mutex — the capture thread
+    writes it, the HTTP thread reads a consistent copy:
+  </p>
+  <pre class="code">typedef struct {
+    long  ts_ms;
+    float rms_db;
+    float peak_db;
+    float peak_hold_db;
+    float wave[WAVE_POINTS];
+    float spec[SPEC_BARS];
+} audio_snapshot_t;</pre>
+  <p>
+    The transport is <strong>Server-Sent Events</strong> over a hand-rolled HTTP server, which is
+    two deliberate choices. SSE rather than WebSockets because the data only ever travels one way:
+    SSE is plain HTTP with a <code>text/event-stream</code> content type and newline-delimited
+    frames, needs no handshake or framing library, and the browser reconnects on its own when the
+    board reboots. And hand-rolled rather than pulling in a web server, because adding a package to
+    an embedded image to serve one static page and one event stream is not a trade worth making.
+  </p>
+  <p>
+    Frames go out at roughly 10&nbsp;Hz — decimated from the ~94&nbsp;Hz capture period, since
+    nothing on screen benefits from being redrawn faster than the eye resolves.
+  </p>
+
+  <h2>The two views</h2>
+  <p>
+    The client is a single <code>index.html</code> drawing to Canvas off the <code>EventSource</code>
+    stream. No framework, no build step, no CDN — it has to work on a board that may have no route
+    to the internet.
+  </p>
+  <p>
+    <strong>Instantaneous:</strong> the waveform normalised to ±1, the spectrum on a −90&nbsp;dB to
+    0&nbsp;dB scale, and a vertical level meter spanning −60&nbsp;dB to 0&nbsp;dB with the RMS as a
+    gradient fill and the held peak as a red line above it.
+  </p>
+  <p>
+    <strong>The last 30 seconds:</strong> a rolling chart holding <code>HISTORY_LEN = 300</code>
+    samples — at ~10&nbsp;Hz, exactly 30 seconds — plotting RMS in green against peak in red, on a
+    0 to −60&nbsp;dB scale. This is the panel that catches the problems worth catching. A steady
+    pair of lines means the link is healthy; a notch means something dropped.
+  </p>
+
+  <h2>Packaging it</h2>
+  <p>
+    The whole thing is a normal Yocto recipe rather than something scp'd onto the board by hand,
+    so it survives a reflash and ships with the image. The recipe's own summary is the honest
+    one-line description of the program:
+  </p>
+  <pre class="code"><span class="c"># meta-aurascope/recipes-apps/aurascope-dash/aurascope-dash_1.0.bb</span>
+
+SUMMARY = "Captures ALSA audio, computes RMS/peak/FFT, and serves a \
+Canvas + Server-Sent-Events dashboard over a hand-rolled HTTP server."</pre>
+  <p>
+    An init script starts it at boot, so the dashboard is up as soon as the board is:
+  </p>
+  <pre class="code">$ /etc/init.d/aurascope-dash status
+$ curl http://&lt;board-ip&gt;:8080/</pre>
 
   <h2>Result</h2>
-  <p>[ The concrete, verifiable win for this step, and what it unlocks for the next one. ]</p>
+  <p>
+    Audio from the nRF5340 gateway's microphone travels over Auracast, decodes on the receiver,
+    crosses USB into ALSA on the Zynq, and is visible in a browser as a live waveform, spectrum and
+    level trace. That's the wireless-to-Linux path proven end to end, not inferred from an
+    enumeration message.
+  </p>
+  <p>
+    It also builds the thing the rest of the project needs. Phase 3 is about observing this audio
+    path two different ways — and both of those need somewhere to display their output. That
+    somewhere now exists, with a live data feed already plumbed into it.
+  </p>
+
+  <h2>Files</h2>
+  <div class="table-wrap">
+    <table>
+      <tr><th></th><th>Path</th><th>What it does</th></tr>
+      <tr><td>new</td><td><code>recipes-apps/aurascope-dash/aurascope-dash_1.0.bb</code></td><td>The recipe — builds and installs the daemon</td></tr>
+      <tr><td>new</td><td><code>.../files/aurascope-dash.init</code></td><td>Starts it at boot</td></tr>
+      <tr><td>new</td><td><code>.../files/audio.c</code>, <code>audio.h</code></td><td>ALSA capture thread, RMS/peak/hold, snapshot struct</td></tr>
+      <tr><td>new</td><td><code>.../files/fft.c</code>, <code>fft.h</code></td><td>1024-point FFT and Hann window</td></tr>
+      <tr><td>new</td><td><code>.../files/http.c</code>, <code>http.h</code></td><td>Hand-rolled HTTP server and the SSE feed</td></tr>
+      <tr><td>new</td><td><code>.../files/index.html</code></td><td>Canvas dashboard — the whole client</td></tr>
+      <tr><td>new</td><td><code>.../files/main.c</code>, <code>Makefile</code></td><td>Startup and build</td></tr>
+      <tr><td>changed</td><td><code>recipes-core/images/aurascope-image.bb</code></td><td>Adds <code>aurascope-dash</code> to the image</td></tr>
+    </table>
+  </div>
 
   <h2>Code</h2>
-  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope">v0.4-audio-streaming</a>.</p>
+  <p>
+    Commit <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope/commit/e1e1bfe">e1e1bfe</a>
+    · code: <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope/tree/main/meta-aurascope/recipes-apps/aurascope-dash">aurascope-dash</a>
+  </p>
 
   <nav class="stepnav">
     <a href="step-03.html">← previous</a>
     <a href="../aurascope.html">all steps</a>
-    <a href="step-05.html">next: audio-status LED →</a>
+    <a href="step-05.html">next: eBPF in the dashboard →</a>
   </nav>
 </main>
 

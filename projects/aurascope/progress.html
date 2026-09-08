@@ -414,10 +414,16 @@
     <p>Device tree for the ChipIdea USB host port plus committed kernel config fragments for the host stack and <code>snd-usb-audio</code>. With the board on its 12&nbsp;V supply, the nRF5340 receiver enumerates and <code>/proc/asound/cards</code> lists it as card 0, attached at <code>usb-ci_hdrc.0-1</code>.</p>
   </div>
 
-  <div class="status-block next">
-    <span class="status-tag next">○ PLANNED</span>
-    <h3>End-to-end streaming test</h3>
-    <p>Capturing from that card on the board itself, so audio is genuinely flowing mic&nbsp;&rarr;&nbsp;Auracast&nbsp;&rarr;&nbsp;Zynq, with a first look at latency.</p>
+  <div class="status-block done">
+    <span class="status-tag done">● DONE</span>
+    <h3>Streaming verified, and a live dashboard</h3>
+    <p>Audio confirmed flowing mic&nbsp;&rarr;&nbsp;Auracast&nbsp;&rarr;&nbsp;Zynq, and <code>aurascope-dash</code> built to watch it: ALSA capture, FFT, and a Canvas dashboard over Server-Sent Events showing an instantaneous waveform and spectrum plus 30&nbsp;s of level history.</p>
+  </div>
+
+  <div class="status-block done">
+    <span class="status-tag done">● DONE</span>
+    <h3>eBPF tracing in the same dashboard</h3>
+    <p>kprobes on <code>snd_pcm_period_elapsed</code> and <code>__snd_pcm_xrun</code> via <code>ply</code>, feeding a period-interval latency histogram and an xrun counter into the same live feed. 6052 period events observed, all in the 16&ndash;32&nbsp;ms bucket, zero xruns.</p>
   </div>
 
   <div class="status-block next">
@@ -428,8 +434,8 @@
 
   <div class="status-block next">
     <span class="status-tag next">○ PLANNED</span>
-    <h3>Observability</h3>
-    <p>The part this project is really about: a kernel character driver and eBPF tracing side by side on the same audio path, a live dashboard over both, then full integration.</p>
+    <h3>The other half of observability</h3>
+    <p>A kernel character driver exposing the same statistics from inside the kernel, to set against what eBPF already reports from outside — then full integration, and the audio-status LED last.</p>
   </div>
 
   <p style="margin-top:36px; color:#8a919c; font-size:.9rem;">

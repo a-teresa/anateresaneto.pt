@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AuraScope · Step 05 — Audio-status LED</title>
-<meta name="description" content="Step 05 of AuraScope: An LED that blinks while audio is arriving and stops when the stream goes silent — driven from Linux off the live ALSA stream." />
+<title>AuraScope · Step 05 — eBPF in the same dashboard</title>
+<meta name="description" content="Step 05 of AuraScope: kprobes on the ALSA hot path via ply, a period-interval latency histogram and xrun counter merged into the existing dashboard feed — and the three silent failures found along the way." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -22,6 +22,8 @@
   .case p { color: #b7bcc4; margin-bottom: 14px; }
   .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
   .case li { margin-bottom: 6px; }
+  .case code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; color: var(--accent); }
   .tagline {
     display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
     background: var(--accent-dim); color: var(--accent);
@@ -32,9 +34,20 @@
     background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 16px; overflow-x: auto; margin: 8px 0 16px;
   }
+  pre.code .c { color: #6f7785; }
+  pre.code .out { color: #7fb88a; }
+  pre.code .err { color: #d98a8a; }
   .note {
     border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
     border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
+  }
+  .deadend {
+    border-left: 3px solid #b05050; background: #1a1212; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #e0bcbc; font-size: .92rem; margin: 16px 0;
+  }
+  .find {
+    border-left: 3px solid var(--accent); background: #0f1a14; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #cfe8d6; font-size: .92rem; margin: 16px 0;
   }
   .stepnav {
     display: flex; justify-content: space-between; gap: 12px; margin-top: 50px;
@@ -43,6 +56,26 @@
   .stepnav a { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
   .stepnav a:hover { color: var(--accent); }
   .stepnav .disabled { opacity: .35; pointer-events: none; }
+  .table-wrap { overflow-x: auto; margin: 8px 0 16px; }
+  .case table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .case th, .case td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .case th {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .5px; color: var(--muted);
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .case td { color: #b7bcc4; }
+  .case td code, .case th code { white-space: nowrap; }
+  figure.cap { margin: 18px 0 8px; }
+  figure.cap img { width: 100%; display: block;
+    border: 1px solid var(--line); border-radius: var(--radius); }
+  figure.cap figcaption { font-family: var(--mono); font-size: 11.5px;
+    color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  ul.figlegend { list-style: none; margin: 12px 0 20px; padding: 0; }
+  ul.figlegend li { color: #a9b0ba; font-size: .9rem; margin-bottom: 7px;
+    padding-left: 14px; border-left: 2px solid var(--line); }
+  ul.figlegend b { color: #cfd6df; font-weight: 600; }
+  .case td:first-child { font-family: var(--mono); font-size: .78rem;
+    text-transform: uppercase; letter-spacing: .5px; color: var(--muted); white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -56,32 +89,284 @@
 <main class="case">
   <p class="crumb"><a href="../../index.html#work">work</a> / <a href="../aurascope.html">aurascope</a> / step 05</p>
 
-  <span class="tagline">STEP 05 · TAG v0.5-audio-led</span>
-  <h1>Audio-status LED</h1>
-  <p class="meta">// phase 2 · audio into linux · status: planned · published [date]</p>
+  <span class="tagline">STEP 05 · TAG v0.5-ebpf</span>
+  <h1>eBPF in the same dashboard</h1>
+  <p class="meta">// phase 3 · observability · status: done, tracing live · published [date]</p>
 
   <h2>The goal of this step</h2>
-  <p>An LED that blinks while audio is arriving and stops when the stream goes silent — driven from Linux off the live ALSA stream.</p>
+  <p>
+    Step 04 shows what the audio <em>sounds</em> like. This step shows what the kernel is
+    <em>doing</em> to deliver it: how regularly the ALSA period interrupt actually fires, and
+    whether the stream ever underruns — measured with real kprobes on the hot path, and drawn into
+    the same dashboard rather than a separate tool.
+  </p>
+  <p>
+    This is the half of the project I care most about. It's also the step where three separate
+    things failed silently, which turned out to be the most useful part.
+  </p>
+  <div class="find">
+    <strong>The theme, again.</strong> Step 03's lesson was that a device-tree node without a
+    driver fails identically to a driver without a device-tree node — silence, no error. This step
+    hit that same shape three more times: a kernel config option that was quietly dropped, a kprobe
+    that attached perfectly and never fired, and a working tracer whose output never arrived. None
+    of the three produced an error message. All three were found by checking the running system
+    instead of trusting the plan.
+  </div>
 
-  <h2>What I did</h2>
+  <h2>Turning on the tracing subsystem</h2>
+  <p>
+    Same config-fragment mechanism as step 03 — a new <code>observ.cfg</code> pulled in by the same
+    <code>linux-xlnx_%.bbappend</code>:
+  </p>
+  <pre class="code"><span class="c"># meta-aurascope/recipes-kernel/linux/linux-xlnx/observ.cfg</span>
+
+CONFIG_BPF=y
+CONFIG_BPF_SYSCALL=y
+CONFIG_BPF_JIT=y
+CONFIG_BPF_EVENTS=y
+CONFIG_KPROBES=y
+CONFIG_KPROBE_EVENTS=y
+CONFIG_UPROBES=y
+CONFIG_FTRACE=y
+CONFIG_FUNCTION_TRACER=y
+CONFIG_DYNAMIC_FTRACE=y
+CONFIG_TRACEPOINTS=y
+CONFIG_PERF_EVENTS=y
+CONFIG_DEBUG_FS=y
+CONFIG_DEBUG_INFO=y
+CONFIG_DEBUG_INFO_BTF=y</pre>
+
+  <h2>Silent failure #1 — BTF never built</h2>
+  <p>
+    After flashing, <code>/sys/kernel/btf/vmlinux</code> didn't exist. Checking what the kernel had
+    actually been built with, rather than what I'd asked for:
+  </p>
+  <pre class="code">$ zcat /proc/config.gz | grep DEBUG_INFO
+<span class="out">CONFIG_DEBUG_INFO_NONE=y</span></pre>
+  <p>
+    Not what the fragment requested, and no build error. The reason is in
+    <code>lib/Kconfig.debug</code> in the kernel source:
+  </p>
+  <pre class="code">config DEBUG_INFO_BTF
+    depends on PAHOLE_VERSION &gt;= 116</pre>
+  <p>
+    <code>PAHOLE_VERSION</code> is computed by probing for <code>pahole</code> on <code>PATH</code>
+    at configure time. No pahole in the build environment means the version reads as zero, the
+    dependency fails, and because <code>DEBUG_INFO</code> is a <em>choice</em> group, the whole
+    thing falls back to <code>DEBUG_INFO_NONE</code>. A requested option didn't just fail to apply
+    — it silently selected its own opposite.
+  </p>
+  <pre class="code"><span class="c"># linux-xlnx_%.bbappend</span>
+DEPENDS += "pahole-native"</pre>
+  <div class="note">
+    <strong>Honest scope:</strong> this fix isn't needed for what actually shipped below — ply
+    doesn't use BTF or CO-RE. I kept it because it's correct, costs nothing on a rebuild, and
+    leaves the door open if this ever grows a real libbpf path. But it is not load-bearing for
+    anything on this page.
+  </div>
+
+  <h2>The toolchain gap, and choosing ply</h2>
+  <p>
+    The plan was a libbpf + CO-RE program: compile with <code>clang -target bpf</code>, generate a
+    skeleton with <code>bpftool</code>, ship a loader. Checking whether that was reachable from this
+    layer stack:
+  </p>
   <ul>
-    <li>[ first concrete thing ]</li>
-    <li>[ second concrete thing ]</li>
-    <li>[ third concrete thing ]</li>
+    <li>No <code>meta-clang</code> layer, and no clang recipe anywhere in poky or meta-openembedded.</li>
+    <li>No <code>bpftool</code> recipe either.</li>
+    <li><code>libbpf</code> itself <em>is</em> available — but the compiler needed to produce an object for it isn't.</li>
+  </ul>
+  <p>
+    Adding a layer and a from-source LLVM build to compile two kprobes is disproportionate. The
+    alternative is <a class="back" style="color:var(--accent)" href="https://github.com/iovisor/ply">ply</a>:
+    a dependency-free dynamic tracer that compiles its own BPF bytecode, no clang or LLVM involved,
+    already packaged in meta-oe. One line in the image recipe:
+  </p>
+  <pre class="code">IMAGE_INSTALL:append = " ... ply"</pre>
+  <p>Proving it works at all, on the real board, before designing anything around it:</p>
+  <pre class="code">$ ply 'kretprobe:vfs_read { @["size"] = quantize(retval); }'</pre>
+  <p>
+    That produced a correct histogram — confirming kprobes, kretprobes, map aggregation and the
+    SIGINT-triggered dump all work on this kernel, with no BTF needed anywhere.
+  </p>
+
+  <h2>Silent failure #2 — the kprobe that was right and useless</h2>
+  <p>
+    The plan's hook for the "ALSA write path" was <code>__snd_pcm_lib_xfer</code>. I'd confirmed the
+    symbol was real by reading <code>sound/core/pcm_lib.c</code> in the fetched kernel source. It
+    attached without complaint. It produced <strong>zero hits</strong> — while audio was visibly,
+    correctly streaming through the step 04 dashboard.
+  </p>
+  <p>The answer was on the running board, in the PCM's own parameters:</p>
+  <pre class="code">$ cat /proc/asound/card0/pcm0c/sub0/hw_params
+<span class="out">access: MMAP_INTERLEAVED</span></pre>
+  <div class="find">
+    <strong>The probe was correct and irrelevant.</strong> <code>__snd_pcm_lib_xfer</code> is only
+    reached through <code>snd_pcm_read()</code> / <code>snd_pcm_write()</code> — the
+    <code>file_operations</code> handlers behind the read/write syscall path. This device uses
+    ALSA's mmap ring-buffer path instead: userspace maps the buffer directly and coordinates with
+    ioctls, so the audio data never passes through a <code>read()</code> at all. A perfectly valid
+    kprobe on a function this data path never calls looks exactly like a broken kprobe.
+  </div>
+  <p>
+    The fix was picking hooks that don't care how userspace gets at the buffer. Both were confirmed
+    against the kernel source, then live-tested:
+  </p>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Symbol</th><th>Why it's access-mode-agnostic</th></tr>
+      <tr><td><code>snd_pcm_period_elapsed</code></td><td>Called by the USB Audio driver's URB-completion handler every period, whatever userspace is doing.</td></tr>
+      <tr><td><code>__snd_pcm_xrun</code></td><td>The real underrun/overrun path, likewise independent of access mode.</td></tr>
+    </table>
+  </div>
+  <p>
+    Live check: <strong>184 hits in 4 seconds</strong>. The device runs
+    <code>period_size = 1024</code> at 48&nbsp;kHz, which predicts 21.3&nbsp;ms per period; 184 in
+    4&nbsp;s is 21.7&nbsp;ms. Close enough to be the same number, which is what confirms the probe
+    is measuring the thing it claims to measure.
+  </p>
+
+  <h2>Silent failure #3 — output that never arrived</h2>
+  <p>
+    The design is deliberately minimal on the ply side. Two probes, each printing one character;
+    all the timing and bucketing happens in my own C code, timestamped on receipt:
+  </p>
+  <pre class="code">kprobe:snd_pcm_period_elapsed { printf("P\n"); }
+kprobe:__snd_pcm_xrun         { printf("X\n"); }</pre>
+  <p>
+    Which raises a buffering problem. The plan assumed a <code>-u</code> unbuffered flag — it exists
+    on ply's GitHub HEAD. The recipe pins an older <code>SRCREV</code>, and checking out that exact
+    commit shows the full option string:
+  </p>
+  <pre class="code">sopts = "c:dehkSTv"</pre>
+  <p>
+    No <code>u</code>. Confirmed on target: <code>ply -u ...</code> fails with
+    <code>invalid option -- 'u'</code>.
+  </p>
+  <div class="find">
+    <strong>Why this would have been invisible.</strong> glibc's stdio picks its buffering mode from
+    what stdout <em>is</em>: line-buffered on a terminal, fully buffered — about 4&nbsp;KB —
+    otherwise. Reading ply through an ordinary pipe, those two-byte <code>"P\n"</code> writes would
+    accumulate for roughly two thousand events before anything was delivered. Not dropped, not
+    errored: just silently held. The dashboard would have sat there reading nothing from a tracer
+    that was working perfectly.
+  </div>
+  <p>
+    The fix needs no flag and no new package — give ply a pseudo-terminal instead of a pipe, and
+    glibc line-buffers it because it believes it's talking to a terminal. That's
+    <code>openpty()</code> before the fork, costing one extra link flag (<code>-lutil</code>).
+  </p>
+
+  <h2>What health.c does</h2>
+  <ul>
+    <li>Writes the two-line ply script to <code>/tmp/aurascope-health.ply</code>.</li>
+    <li><code>openpty()</code>, then fork/exec ply with the child's stdout on the pty slave.</li>
+    <li>A reader thread blocks on <code>fgets()</code> from the master and timestamps each line on arrival with <code>CLOCK_MONOTONIC</code>.</li>
+    <li><code>P</code> → delta since the previous <code>P</code>, bucketed into one of 12 log<sub>2</sub> millisecond bins.</li>
+    <li><code>X</code> → increment <code>xrun_total</code>, record <code>xrun_last_ms</code>.</li>
+    <li>A <code>SIGTERM</code>/<code>SIGINT</code> handler kills the ply child, so stopping the daemon doesn't orphan a trace running forever.</li>
+    <li>Failure is non-fatal — if ply won't start, the audio dashboard carries on without the health panel.</li>
+  </ul>
+  <p>
+    Keeping ply to "an event happened, say so" also sidesteps its typed-time and aggregation-map
+    formatting entirely. There's no parsing to get wrong, and no dependency on output formats that
+    could shift between ply versions.
+  </p>
+
+  <h2>One feed, not two</h2>
+  <p>
+    The health data merges into the <em>same</em> SSE frame as the audio, so the client has one
+    <code>EventSource</code> and no possibility of two streams disagreeing about what time it is:
+  </p>
+  <pre class="code">"health": { "ok": true, "xrun_total": 0, "xrun_last_ms": 0,
+            "period_hist": [0,0,0,0,0,6052,0,0,0,0,0,0] }</pre>
+  <p>
+    The client gains a histogram with 12 buckets — <code>&lt;1</code>, <code>1-2</code>,
+    <code>2-4</code> … <code>512-1k</code>, <code>&gt;1k</code> ms — bars turning orange once a gap
+    reaches the 32&nbsp;ms buckets, well past the ~21&nbsp;ms norm. Alongside it, the xrun counter
+    and how long into the run the last one happened.
+  </p>
+  <figure class="cap">
+    <img src="img/ebpf_via_ply.png" alt="The lower half of the AuraScope dashboard. Top right, a level meter reading rms -5.0 dB, peak 0.0 dB, hold 0.0 dB. Below it a 30-second history chart with a flat red peak line at 0 dB and a green RMS line near -5 dB showing two brief downward dips. Below that, a period-interval latency histogram with one tall bar in the 16-32 millisecond bucket and all other buckets empty, beside an observability panel reading tracing live with 6052 period events, 0 xruns, no xrun observed yet." />
+    <figcaption>The lower half of the dashboard: 30-second level history above, the two eBPF-fed panels below — audio and kernel timing in one view.</figcaption>
+  </figure>
+  <ul class="figlegend">
+    <li><b>Level history (last 30 s)</b> — red peak pinned at 0.0&nbsp;dB, green RMS steady around &minus;5&nbsp;dB. Two brief downward dips are visible in the green trace, one noticeably deeper than the other.</li>
+    <li><b>Period-interval latency</b> — one bar, in the <code>16-32</code>&nbsp;ms bucket, every other bucket empty. That is 6052 consecutive kprobe hits with not a single interval landing anywhere else.</li>
+    <li><b>Observability</b> — <code>tracing live (6052 period events)</code> confirms ply is attached and delivering; <code>0 xruns</code> with <code>no xrun observed yet</code> means <code>__snd_pcm_xrun</code> has never once been reached.</li>
+  </ul>
+  <div class="find">
+    <strong>This is the payoff for putting both on one page.</strong> The audio level dipped twice
+    — but across the same window the period histogram never left its bucket and the xrun count
+    stayed at zero. So whatever caused those dips, the kernel's delivery path was never disturbed
+    by it: no late period, no starved buffer. That localises the interruption to somewhere upstream
+    of ALSA — the Auracast link or the source itself — and rules out the Linux host. Neither panel
+    could support that conclusion on its own. The level trace alone would say "something dropped"
+    with no idea where; the histogram alone would say "the host is fine" without knowing anything
+    had happened at all.
+  </div>
+  <p>
+    One bar in the right bucket is the good outcome: the period interrupt is arriving on schedule
+    and the stream isn't starving. A second bar appearing further right is the interesting failure,
+    and is precisely what this panel exists to catch.
+  </p>
+
+  <h2>Verifying before touching the board</h2>
+  <p>
+    The pty trick and the bucket arithmetic are both easy to get subtly wrong, so both were tested
+    on the host first — ply swapped for a shell loop emitting <code>P</code> every 20&nbsp;ms and
+    <code>X</code> every fifteenth line, run for two seconds:
+  </p>
+  <pre class="code"><span class="out">ply_ok=1, xrun_total=2, xrun_last_ms=603
+period_hist: 0 0 0 0 0 39 0 0 0 0 0 0</span></pre>
+  <p>
+    39 events in the <code>[16,32)</code> ms bucket, matching the 20&nbsp;ms stand-in interval, and
+    both xrun markers counted. That validates the buffering fix and the bucket maths end to end
+    before any of it depends on hardware.
+  </p>
+  <p>
+    Everything else was checked against primary sources rather than memory: ply's option string and
+    grammar against its pinned <code>SRCREV</code> rather than HEAD, and every kernel symbol against
+    the actual fetched linux-xlnx 6.12.40 tree in <code>build/tmp/work-shared/</code>. Given that
+    two of the three failures on this page came from trusting a plan over the running system, that
+    isn't ceremony.
+  </p>
+
+  <h2>Honest gaps</h2>
+  <ul>
+    <li><strong>The histogram is cumulative</strong>, not a rolling window — over a long uptime, recent behaviour gets diluted by everything before it. A decaying or windowed histogram is the obvious next move.</li>
+    <li><strong>No libbpf/CO-RE path.</strong> ply is the backend. Worth revisiting if meta-clang and bpftool ever land in this layer stack.</li>
+    <li><strong>No xrun has been observed yet</strong>, so the counter is correct-by-construction rather than correct-by-demonstration. Unplugging the USB cable mid-stream should provoke one; until that's done, that half is untested against a real event.</li>
+    <li><strong>ply's own formatting was sidestepped, not characterised.</strong> Treating it as a bare event source avoids the question rather than answering it.</li>
   </ul>
 
-  <h2>The tricky part</h2>
-  <p>[ The one thing that actually cost time. Be specific and honest — this is the section readers remember. ]</p>
-
-  <pre class="code"># [ the handful of commands / code that matter — keep it copy-pasteable ]</pre>
-
-  <div class="note"><strong>Honest note:</strong> [ anything simulated, stubbed, or deferred at this stage — state it plainly. ]</div>
-
-  <h2>Result</h2>
-  <p>[ The concrete, verifiable win for this step, and what it unlocks for the next one. ]</p>
+  <h2>Files</h2>
+  <div class="table-wrap">
+    <table>
+      <tr><th></th><th>Path</th><th>What it does</th></tr>
+      <tr><td>new</td><td><code>.../aurascope-dash/files/health.c</code>, <code>health.h</code></td><td>ply child, pty reader thread, histogram and xrun counters</td></tr>
+      <tr><td>new</td><td><code>recipes-kernel/linux/linux-xlnx/observ.cfg</code></td><td>BPF, kprobes, ftrace, perf events</td></tr>
+      <tr><td>changed</td><td><code>.../files/http.c</code></td><td>Adds the <code>health</code> object to each SSE frame</td></tr>
+      <tr><td>changed</td><td><code>.../files/index.html</code></td><td>Latency histogram and xrun readout</td></tr>
+      <tr><td>changed</td><td><code>.../files/main.c</code></td><td>Starts the health monitor alongside audio capture</td></tr>
+      <tr><td>changed</td><td><code>.../files/Makefile</code></td><td><code>health.c</code> in <code>SRCS</code>, <code>-lutil</code> in <code>LDLIBS</code></td></tr>
+      <tr><td>changed</td><td><code>.../aurascope-dash_1.0.bb</code></td><td>New sources in <code>SRC_URI</code>, <code>RDEPENDS</code> on ply</td></tr>
+      <tr><td>changed</td><td><code>recipes-kernel/linux/linux-xlnx_%.bbappend</code></td><td><code>observ.cfg</code>, and <code>pahole-native</code> for BTF</td></tr>
+      <tr><td>changed</td><td><code>recipes-core/images/aurascope-image.bb</code></td><td>Adds <code>ply</code> to the image</td></tr>
+    </table>
+  </div>
+  <div class="note">
+    <strong>No kernel rebuild needed</strong> for the health panel — the ply-based path runs on the
+    kernel as already flashed. <code>bitbake aurascope-dash</code> and
+    <code>bitbake aurascope-image</code> are enough. The pahole/BTF fix only matters if a real
+    libbpf path ever gets added.
+  </div>
 
   <h2>Code</h2>
-  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope">v0.5-audio-led</a>.</p>
+  <p>
+    Commit <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope/commit/48887fd887ef67a7efe5dd9df3fc35f11e437016">48887fd</a>
+    · code: <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope/tree/main/meta-aurascope/recipes-apps/aurascope-dash">aurascope-dash</a>
+  </p>
 
   <nav class="stepnav">
     <a href="step-04.html">← previous</a>

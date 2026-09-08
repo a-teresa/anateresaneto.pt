@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AuraScope · Step 07 — eBPF tracing</title>
-<meta name="description" content="Step 07 of AuraScope: kprobes on the ALSA write path; latency histograms gathered from outside the kernel module." />
+<title>AuraScope · Step 07 — Full integration</title>
+<meta name="description" content="Step 07 of AuraScope: End-to-end: Auracast in, ALSA on the Zynq, both observability layers running side by side — with the final diagram." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -22,6 +22,8 @@
   .case p { color: #b7bcc4; margin-bottom: 14px; }
   .case ul { color: #b7bcc4; margin: 0 0 14px 20px; }
   .case li { margin-bottom: 6px; }
+  .case code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; color: var(--accent); }
   .tagline {
     display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
     background: var(--accent-dim); color: var(--accent);
@@ -32,9 +34,20 @@
     background: var(--bg-elev); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 16px; overflow-x: auto; margin: 8px 0 16px;
   }
+  pre.code .c { color: #6f7785; }
+  pre.code .out { color: #7fb88a; }
+  pre.code .err { color: #d98a8a; }
   .note {
     border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
     border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
+  }
+  .deadend {
+    border-left: 3px solid #b05050; background: #1a1212; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #e0bcbc; font-size: .92rem; margin: 16px 0;
+  }
+  .find {
+    border-left: 3px solid var(--accent); background: #0f1a14; padding: 12px 16px;
+    border-radius: 0 var(--radius) var(--radius) 0; color: #cfe8d6; font-size: .92rem; margin: 16px 0;
   }
   .stepnav {
     display: flex; justify-content: space-between; gap: 12px; margin-top: 50px;
@@ -43,6 +56,17 @@
   .stepnav a { font-family: var(--mono); font-size: 13px; color: var(--muted); text-decoration: none; }
   .stepnav a:hover { color: var(--accent); }
   .stepnav .disabled { opacity: .35; pointer-events: none; }
+  .table-wrap { overflow-x: auto; margin: 8px 0 16px; }
+  .case table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .case th, .case td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .case th {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .5px; color: var(--muted);
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .case td { color: #b7bcc4; }
+  .case td code, .case th code { white-space: nowrap; }
+  .case td:first-child { font-family: var(--mono); font-size: .78rem;
+    text-transform: uppercase; letter-spacing: .5px; color: var(--muted); white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -56,12 +80,12 @@
 <main class="case">
   <p class="crumb"><a href="../../index.html#work">work</a> / <a href="../aurascope.html">aurascope</a> / step 07</p>
 
-  <span class="tagline">STEP 07 · TAG v0.7-ebpf-trace</span>
-  <h1>eBPF tracing</h1>
-  <p class="meta">// phase 3 · observability · status: planned · published [date]</p>
+  <span class="tagline">STEP 07 · TAG v1.0-integration</span>
+  <h1>Full integration</h1>
+  <p class="meta">// phase 4 · integration · status: planned · published [date]</p>
 
   <h2>The goal of this step</h2>
-  <p>kprobes on the ALSA write path; latency histograms gathered from outside the kernel module.</p>
+  <p>End-to-end: Auracast in, ALSA on the Zynq, both observability layers running side by side — with the final diagram.</p>
 
   <h2>What I did</h2>
   <ul>
@@ -81,12 +105,12 @@
   <p>[ The concrete, verifiable win for this step, and what it unlocks for the next one. ]</p>
 
   <h2>Code</h2>
-  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope">v0.7-ebpf-trace</a>.</p>
+  <p>Tagged at <a class="back" style="color:var(--accent)" href="https://github.com/a-teresa/aurascope">v1.0-integration</a>.</p>
 
   <nav class="stepnav">
     <a href="step-06.html">← previous</a>
     <a href="../aurascope.html">all steps</a>
-    <a href="step-08.html">next: dashboard →</a>
+    <a href="step-08.html">next: audio-status LED →</a>
   </nav>
 </main>
 
