@@ -279,7 +279,7 @@ kprobe:__snd_pcm_xrun         { printf("X\n"); }</pre>
     <code>EventSource</code> and no possibility of two streams disagreeing about what time it is:
   </p>
   <pre class="code">"health": { "ok": true, "xrun_total": 0, "xrun_last_ms": 0,
-            "period_hist": [0,0,0,0,0,6052,0,0,0,0,0,0] }</pre>
+            "period_hist": [0,0,0,0,0,9350,0,0,0,0,0,0] }</pre>
   <p>
     The client gains a histogram with 12 buckets — <code>&lt;1</code>, <code>1-2</code>,
     <code>2-4</code> … <code>512-1k</code>, <code>&gt;1k</code> ms — bars turning orange once a gap
@@ -287,23 +287,24 @@ kprobe:__snd_pcm_xrun         { printf("X\n"); }</pre>
     and how long into the run the last one happened.
   </p>
   <figure class="cap">
-    <img src="img/ebpf_via_ply.png" alt="The lower half of the AuraScope dashboard. Top right, a level meter reading rms -5.0 dB, peak 0.0 dB, hold 0.0 dB. Below it a 30-second history chart with a flat red peak line at 0 dB and a green RMS line near -5 dB showing two brief downward dips. Below that, a period-interval latency histogram with one tall bar in the 16-32 millisecond bucket and all other buckets empty, beside an observability panel reading tracing live with 6052 period events, 0 xruns, no xrun observed yet." />
+    <img src="img/ebpf_ply.png" alt="The lower half of the AuraScope dashboard. A 30-second history chart with a red peak line pinned near 0 dB and a green RMS line just below it, dipping repeatedly and irregularly across the whole window. Below it a period-interval latency histogram with one tall bar in the 16-32 millisecond bucket and every other bucket empty, beside an observability panel reading tracing live with 9350 period events, 0 xruns, no xrun observed yet." />
     <figcaption>The lower half of the dashboard: 30-second level history above, the two eBPF-fed panels below — audio and kernel timing in one view.</figcaption>
   </figure>
   <ul class="figlegend">
-    <li><b>Level history (last 30 s)</b> — red peak pinned at 0.0&nbsp;dB, green RMS steady around &minus;5&nbsp;dB. Two brief downward dips are visible in the green trace, one noticeably deeper than the other.</li>
-    <li><b>Period-interval latency</b> — one bar, in the <code>16-32</code>&nbsp;ms bucket, every other bucket empty. That is 6052 consecutive kprobe hits with not a single interval landing anywhere else.</li>
-    <li><b>Observability</b> — <code>tracing live (6052 period events)</code> confirms ply is attached and delivering; <code>0 xruns</code> with <code>no xrun observed yet</code> means <code>__snd_pcm_xrun</code> has never once been reached.</li>
+    <li><b>Level history (last 30 s)</b> — red peak pinned near 0&nbsp;dB, green RMS just below it and dipping constantly across the whole window. This is real program material, so that movement is the music, not a fault.</li>
+    <li><b>Period-interval latency</b> — one bar, in the <code>16-32</code>&nbsp;ms bucket, every other bucket empty. That is 9350 consecutive kprobe hits without a single interval landing anywhere else.</li>
+    <li><b>Observability</b> — <code>tracing live (9350 period events)</code> confirms ply is attached and delivering; <code>0 xruns</code> with <code>no xrun observed yet</code> means <code>__snd_pcm_xrun</code> has never once been reached.</li>
   </ul>
   <div class="find">
-    <strong>This is the payoff for putting both on one page.</strong> The audio level dipped twice
-    — but across the same window the period histogram never left its bucket and the xrun count
-    stayed at zero. So whatever caused those dips, the kernel's delivery path was never disturbed
-    by it: no late period, no starved buffer. That localises the interruption to somewhere upstream
-    of ALSA — the Auracast link or the source itself — and rules out the Linux host. Neither panel
-    could support that conclusion on its own. The level trace alone would say "something dropped"
-    with no idea where; the histogram alone would say "the host is fine" without knowing anything
-    had happened at all.
+    <strong>This is the payoff for putting both on one page.</strong> The level trace is in constant
+    motion — but that tells you nothing on its own, because real audio is <em>supposed</em> to move.
+    A dip could equally be a quiet passage or a stream falling over, and the audio panel cannot tell
+    you which. The histogram can: across the same window, all 9350 period intervals landed in one
+    bucket and the xrun count never left zero. So the kernel delivered every period on schedule
+    while the content varied wildly underneath it. That separates <em>the signal is changing</em>
+    from <em>the delivery is faltering</em> — a distinction neither panel can draw alone, and the
+    whole reason for merging the eBPF data into the audio dashboard instead of running a separate
+    tool beside it.
   </div>
   <p>
     One bar in the right bucket is the good outcome: the period interrupt is arriving on schedule

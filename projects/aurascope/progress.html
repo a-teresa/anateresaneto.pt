@@ -417,13 +417,13 @@
   <div class="status-block done">
     <span class="status-tag done">● DONE</span>
     <h3>Streaming verified, and a live dashboard</h3>
-    <p>Audio confirmed flowing mic&nbsp;&rarr;&nbsp;Auracast&nbsp;&rarr;&nbsp;Zynq, and <code>aurascope-dash</code> built to watch it: ALSA capture, FFT, and a Canvas dashboard over Server-Sent Events showing an instantaneous waveform and spectrum plus 30&nbsp;s of level history.</p>
+    <p>Audio confirmed flowing mic&nbsp;&rarr;&nbsp;Auracast&nbsp;&rarr;&nbsp;Zynq, and <code>aurascope-dash</code> built to watch it: ALSA capture, FFT, and a Canvas dashboard over Server-Sent Events showing a waveform per stereo channel and a spectrum, plus 30&nbsp;s of level history.</p>
   </div>
 
   <div class="status-block done">
     <span class="status-tag done">● DONE</span>
     <h3>eBPF tracing in the same dashboard</h3>
-    <p>kprobes on <code>snd_pcm_period_elapsed</code> and <code>__snd_pcm_xrun</code> via <code>ply</code>, feeding a period-interval latency histogram and an xrun counter into the same live feed. 6052 period events observed, all in the 16&ndash;32&nbsp;ms bucket, zero xruns.</p>
+    <p>kprobes on <code>snd_pcm_period_elapsed</code> and <code>__snd_pcm_xrun</code> via <code>ply</code>, feeding a period-interval latency histogram and an xrun counter into the same live feed. 9350 period events observed, all in the 16&ndash;32&nbsp;ms bucket, zero xruns.</p>
   </div>
 
   <div class="status-block next">

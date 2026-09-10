@@ -228,9 +228,9 @@
     <p>
       Audio is flowing and instrumented. <code>aurascope-dash</code> runs on the board serving a
       live scope — waveform, spectrum and 30&nbsp;s of level history — and eBPF kprobes on the ALSA
-      hot path now feed a period-latency histogram and xrun counter into the same page. 6052 period
-      events, all in the 16–32&nbsp;ms bucket, zero xruns. Next is the character driver, so the
-      same data can be compared from inside the kernel.
+      hot path now feed a period-latency histogram and xrun counter into the same page. 9350 period
+      events, all in the 16–32&nbsp;ms bucket, zero xruns, while real program audio played through
+      it. Next is the character driver, so the same data can be compared from inside the kernel.
     </p>
   </div>
 
@@ -259,7 +259,7 @@
     </a>
     <a class="step" href="aurascope/step-04.html">
       <span class="step-id">04</span>
-      <div class="step-body"><h3>Streaming, and a scope to watch it with</h3><p>Audio confirmed flowing, and a live dashboard: instantaneous waveform + spectrum, plus 30&nbsp;s of level history.</p></div>
+      <div class="step-body"><h3>Streaming, and a scope to watch it with</h3><p>Audio confirmed flowing, and a live dashboard: per-channel waveforms + spectrum, plus 30&nbsp;s of level history.</p></div>
       <span class="step-tag">v0.4</span>
     </a>
   </div>
