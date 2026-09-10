@@ -341,6 +341,23 @@ period_hist: 0 0 0 0 0 39 0 0 0 0 0 0</span></pre>
     <li><strong>ply's own formatting was sidestepped, not characterised.</strong> Treating it as a bare event source avoids the question rather than answering it.</li>
   </ul>
 
+  <h2>The rig this ran on</h2>
+  <p>
+    Everything on this page came off three boards on a desk. Worth a photo, because a couple of the
+    physical details are exactly the things that cost time earlier in the project:
+  </p>
+  <figure class="cap">
+    <img src="img/setup.jpg" alt="Three development boards on a white surface. Left: an nRF5340-DK with a microphone module wired to its header by coloured jumper leads, green LEDs lit, a micro-USB cable leaving the bottom. Top right: a second nRF5340-DK with green LEDs lit and a micro-USB cable in its nRF5340 USB port. Bottom right: a white Digilent Arty Z7-20 board with a Zynq-7000 chip, the black USB cable from the second nRF board plugged into its type-A USB HOST socket, a white Ethernet cable, and a barrel-jack power lead, with a red LED lit." />
+    <figcaption>Gateway (left), receiver (top right), and the Arty Z7-20 host (bottom right).</figcaption>
+  </figure>
+  <ul class="figlegend">
+    <li><b>The microphone is wired, not simulated.</b> Those coloured leads on the left board go from an I2S microphone straight onto the gateway's header. That is where the audio in every chart on this page originates.</li>
+    <li><b>The receiver's cable is in the right socket.</b> It goes to the <code>nRF5340 USB</code> port, not the <code>IMCU USB</code> debug port next to it. Only one of those two carries the USB Audio Class device; the other just talks to the debugger. Plugging into the wrong one gives you a board that looks connected and enumerates nothing.</li>
+    <li><b>That cable lands in the Arty's type-A <code>USB HOST</code> socket</b> — the port brought up by the device tree and kernel config in <a href="step-03.html" style="color:var(--accent)">step 03</a>.</li>
+    <li><b>Power comes from the barrel jack, not USB.</b> The jumper is set to the external supply, which is what finally let the host port source VBUS — the fix that ended step 03 with the card appearing. The UART console keeps working regardless.</li>
+    <li><b>The green LEDs on both nRF boards are the streaming indicators.</b> Lit on the gateway and the receiver at the same time means the broadcast is up and synced at both ends.</li>
+  </ul>
+
   <h2>Files</h2>
   <div class="table-wrap">
     <table>

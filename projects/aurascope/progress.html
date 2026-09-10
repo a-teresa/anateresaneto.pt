@@ -59,6 +59,28 @@
     border-left: 3px solid var(--warn); background: #1a1710; padding: 12px 16px;
     border-radius: 0 var(--radius) var(--radius) 0; color: #d8cfb8; font-size: .92rem; margin: 16px 0;
   }
+  .clip { margin: 22px 0 8px; }
+  .clip video {
+    width: 100%; display: block; background: #000;
+    border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .clip figcaption {
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+    margin-top: 8px; line-height: 1.5;
+  }
+  .chain { list-style: none; margin: 16px 0 8px; padding: 0; counter-reset: chain; }
+  .chain li {
+    color: #b7bcc4; font-size: .93rem; margin-bottom: 10px;
+    padding-left: 34px; position: relative;
+  }
+  .chain li::before {
+    counter-increment: chain; content: counter(chain);
+    position: absolute; left: 0; top: 1px;
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    color: var(--accent); background: var(--accent-dim);
+    width: 20px; height: 20px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+  }
 </style>
 </head>
 <body>
@@ -406,7 +428,7 @@
     </figure>
   </div>
 
-  <h2>What's still ahead</h2>
+  <h2>Audio into Linux, and eyes on it</h2>
 
   <div class="status-block done">
     <span class="status-tag done">● DONE</span>
@@ -425,6 +447,42 @@
     <h3>eBPF tracing in the same dashboard</h3>
     <p>kprobes on <code>snd_pcm_period_elapsed</code> and <code>__snd_pcm_xrun</code> via <code>ply</code>, feeding a period-interval latency histogram and an xrun counter into the same live feed. 9350 period events observed, all in the 16&ndash;32&nbsp;ms bucket, zero xruns.</p>
   </div>
+
+  <h3 style="font-size:1rem;margin:34px 0 8px;color:var(--text);">The whole chain, running</h3>
+  <p>
+    Every stage above is live at the same time in this clip. Sound goes into a microphone wired to
+    one nRF5340, crosses the room as radio, and comes out the other end as numbers a Linux kernel
+    is being measured on:
+  </p>
+  <ul class="chain">
+    <li><strong>Capture.</strong> An I2S microphone feeds the nRF5340 gateway on the left.</li>
+    <li><strong>Encode and broadcast.</strong> The gateway encodes to LC3 and broadcasts it as Auracast — two Broadcast Isochronous Streams, one per stereo channel.</li>
+    <li><strong>Receive.</strong> The second nRF5340 syncs to both streams, decodes the LC3, and presents itself over USB as a standard USB Audio Class device.</li>
+    <li><strong>Into Linux.</strong> The Arty Z7-20's USB host port enumerates it, <code>snd-usb-audio</code> binds it, and it becomes ALSA card 0 on the Zynq.</li>
+    <li><strong>Observe.</strong> <code>aurascope-dash</code> captures from that card and serves the live scope, while eBPF kprobes on <code>snd_pcm_period_elapsed</code> and <code>__snd_pcm_xrun</code> report how punctually the kernel is delivering it.</li>
+  </ul>
+  <figure class="clip">
+    <video src="img/setup-blinking.mp4" poster="img/setup-poster.jpg"
+           controls muted loop playsinline preload="metadata"
+           aria-label="A three-second clip of the running rig, filmed from above. On the left an nRF5340-DK with a microphone wired to its header by coloured leads, its green status LED pulsing. Top right, the second nRF5340-DK with a USB cable running from it down to the white Arty Z7-20 board below, which has a red LED lit beside its Ethernet and barrel-jack power connectors. The green LEDs on the two Nordic boards blink throughout while audio streams.">
+      Your browser cannot play this video. It is a three-second clip of the AuraScope rig running:
+      an nRF5340 gateway with an I2S microphone on its header, a second nRF5340 receiver connected
+      by USB to an Arty Z7-20, and the status LEDs on both Nordic boards blinking to indicate an
+      active Auracast broadcast while audio streams through to the Zynq.
+    </video>
+    <figcaption>The rig mid-stream — status LEDs blinking on both nRF5340 dev kits while audio runs through to the Arty. 3&nbsp;s, no sound.</figcaption>
+  </figure>
+  <ul class="chain" style="counter-reset:none;">
+    <li style="padding-left:0;"><b style="color:#cfd6df;">What to watch for</b> — the green LED on the gateway (left) and on the receiver (top right) pulsing together. On Nordic's Auracast firmware that is the broadcast-active indicator, so both blinking at once means the stream is up at the transmitting <em>and</em> receiving end, not just being sent into the void.</li>
+    <li style="padding-left:0;"><b style="color:#cfd6df;">The steady red LED</b> on the Arty is its power indicator, confirming the board is running off the barrel jack rather than USB — the condition that lets its USB host port supply VBUS to the receiver.</li>
+  </ul>
+  <p>
+    The blinking is the honest part: it is the two radios reporting an active broadcast, not a
+    rendering of something recorded earlier. Nothing here is stubbed &mdash; the microphone, the
+    radio link, the USB enumeration and the kernel tracing are all running at once.
+  </p>
+
+  <h2>What's still ahead</h2>
 
   <div class="status-block next">
     <span class="status-tag next">○ PLANNED</span>
